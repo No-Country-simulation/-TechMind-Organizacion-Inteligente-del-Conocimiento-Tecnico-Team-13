@@ -57,17 +57,13 @@ CapaTecnologíaVersión sugeridaCiencia de DatosPython, Pandas, Scikit-learn, TF
 
 📁 Estructura del proyecto
 
+```
 knowledgesort/
-
 ├── data-science/
-
 │   ├── notebook_eda_entrenamiento.ipynb
-
 │   ├── dataset/
-
 │   └── modelo/
 │       └── modelo_clasificacion.joblib
-
 ├── model-service/                # FastAPI
 │   ├── app/
 │   │   ├── main.py
@@ -75,17 +71,14 @@ knowledgesort/
 │   │   └── busqueda_semantica.py
 │   ├── requirements.txt
 │   └── Dockerfile
-
 ├── api-service/                  # Spring Boot
 │   ├── src/main/java/...
 │   ├── src/main/resources/application.yml
 │   ├── pom.xml
 │   └── Dockerfile
-
 ├── postman/
 │   └── coleccion_knowledgesort.postman_collection.json
-
 ├── docker-compose.yml
-
 ├── .env.example
 └── README.md
+```
