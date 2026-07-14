@@ -53,7 +53,7 @@ Base de datos: persistencia de resultados y contenidos ya catalogados.
 
 🛠️ Tecnologías utilizadas
 
-CapaTecnologíaVersión sugeridaCiencia de DatosPython, Pandas, Scikit-learn, TF-IDFPython 3.11Serialización de modelojoblib—Servicio de modeloFastAPI, Uvicorn0.110.xBúsqueda semánticaLangChain + OpenAI API (embeddings)—API principalJava 17, Spring Boot, MavenSpring Boot 3.xPersistenciaPostgreSQL u Oracle Autonomous DB15.x / 19cCloudOCI Object Storage, OCI Compute (opcional)—ContenedoresDocker, Docker Compose24.xTestingPostman, pytest, JUnit—DiseñoFigma—
+<img width="715" height="485" alt="image" src="https://github.com/user-attachments/assets/66b27391-b1d1-4c91-b3e5-317df398bcf0" />
 
 📁 Estructura del proyecto
 
