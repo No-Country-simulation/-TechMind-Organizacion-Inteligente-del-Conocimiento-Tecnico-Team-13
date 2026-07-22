@@ -2,9 +2,7 @@
 
 A Spring Boot + Vaadin project. Build your UI in pure Java — no HTML, no JavaScript.
 
-> **New to Vaadin?** The 5-minute [Quickstart](https://vaadin.com/quickstart) walks you from here to your first running app, a live code change, and an AI-assisted edit with Copilot.
 
----
 
 ## Fastest start — no plugin needed
 
@@ -29,8 +27,6 @@ Running with `spring-boot:run` works, but Java code changes need a server restar
 - **IntelliJ IDEA:** install *Vaadin* from the JetBrains Marketplace → **Debug using Hotswap Agent** (dropdown next to Run). *Just installed it? Let IntelliJ finish indexing, or restart it, if the menu item isn't there yet.*
 - **VS Code:** install the *Vaadin* extension → **Vaadin: Debug using Hotswap Agent** from the command palette.
 - **Eclipse:** install the *Vaadin* plugin → right-click the project → **Run As → Vaadin Application**.
-
-This is what makes the edit-and-see-it loop feel instant — and it's required for the AI edits in [Vaadin Copilot](https://vaadin.com/docs/latest/tools/copilot).
 
 ---
 
