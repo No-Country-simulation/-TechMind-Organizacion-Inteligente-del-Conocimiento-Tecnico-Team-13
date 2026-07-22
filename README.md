@@ -70,17 +70,3 @@ docker run -p 8080:8080 --name logicore-app logicore-app
 ```bash
 docker compose up --build
 ```
-
-### Publish to GitHub
-
-1. Create a new public GitHub repository.
-2. Push the project to the repository.
-3. Add a short description and choose the license.
-4. Optionally add a GitHub Actions workflow to build the Docker image automatically.
-
-## Learn more
-
-- [Vaadin Quickstart](https://vaadin.com/quickstart) — the 5-minute getting-started path
-- [Components](https://vaadin.com/docs/latest/components) — 50+ UI components, all callable from Java
-- [Vaadin Copilot](https://vaadin.com/docs/latest/tools/copilot) — visual + AI editing in the browser
-- [Full documentation](https://vaadin.com/docs)
