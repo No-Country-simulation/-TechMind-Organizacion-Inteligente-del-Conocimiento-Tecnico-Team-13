@@ -1,84 +1,90 @@
-# G9-LATAM-Team 13
-# TechMind-Organizacion-Inteligente-del-Conocimiento-Tecnico
-Plataforma inteligente que optimiza la gestión de contenido técnico (documentación, tutoriales y artículos) mediante Ciencia de Datos. El sistema procesa y clasifica los textos automáticamente, identificando la información clave para facilitar su rápida consulta, organización y reutilización eficiente.
-Tabla de contenidos
+# My Application
 
+A Spring Boot + Vaadin project. Build your UI in pure Java — no HTML, no JavaScript.
 
-El problema
-La solución
-Arquitectura
-Tecnologías utilizadas
-Estructura del proyecto
-Instalación y ejecución
-Uso de la API
-Integración con OCI
-Ciencia de Datos — Notebook
-Testing
-Equipo
-Roadmap futuro
-Licencia
+> **New to Vaadin?** The 5-minute [Quickstart](https://vaadin.com/quickstart) walks you from here to your first running app, a live code change, and an AI-assisted edit with Copilot.
 
+---
 
+## Fastest start — no plugin needed
 
-🧩 El problema
+From the project folder:
 
-Cada día, estudiantes y profesionales de tecnología consumen enormes volúmenes de contenido técnico: documentación, tutoriales, artículos, apuntes de curso. Ese contenido casi nunca queda organizado — se acumula sin categorizar, sin etiquetas y sin forma sencilla de encontrarlo o reutilizarlo más adelante.
-
-El resultado es previsible: tiempo perdido buscando información que ya se leyó antes, catalogación manual que nadie sostiene en el tiempo, y bases de conocimiento que crecen en desorden en lugar de crecer en valor.
-
-KnowledgeSort ataca ese problema construyendo una capa de organización automática: recibe texto técnico y devuelve, de forma estructurada, qué es, de qué trata y con qué otro contenido se relaciona.
-
-💡 La solución
-
-Una API que recibe contenido técnico (título + texto) y devuelve:
-
-
-Categoría temática del contenido (ej. Backend, Frontend, Datos, DevOps)
-Palabras clave relevantes extraídas automáticamente
-Contenidos relacionados ya existentes en la base de conocimiento (búsqueda semántica)
-Resultado siempre en JSON, listo para ser consumido por otras aplicaciones (LMS, wikis internas, portales de documentación)
-
-
-🏗️ Arquitectura
-
-Arquitectura de dos capas para separar responsabilidades por lenguaje/expertise del equipo:
-<img width="698" height="157" alt="image" src="https://github.com/user-attachments/assets/bad1b9be-8a37-4a8d-9663-3f42f4d860ac" />
-
-
-API Java (Spring Boot): punto de entrada público, validación, orquestación y persistencia.
-Microservicio Python (FastAPI): inferencia del modelo entrenado + búsqueda semántica.
-OCI Object Storage: almacenamiento del modelo serializado y documentos procesados.
-Base de datos: persistencia de resultados y contenidos ya catalogados.
-
-
-🛠️ Tecnologías utilizadas
-
-<img width="715" height="485" alt="image" src="https://github.com/user-attachments/assets/66b27391-b1d1-4c91-b3e5-317df398bcf0" />
-
-📁 Estructura del proyecto
-
+```bash
+./mvnw spring-boot:run        # Windows: mvnw.cmd spring-boot:run
 ```
-knowledgesort/
-├── data-science/
-│   ├── notebook_eda_entrenamiento.ipynb
-│   ├── dataset/
-│   └── modelo/
-│       └── modelo_clasificacion.joblib
-├── model-service/                # FastAPI
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── inferencia.py
-│   │   └── busqueda_semantica.py
-│   ├── requirements.txt
-│   └── Dockerfile
-├── api-service/                  # Spring Boot
-│   ├── src/main/java/...
-│   ├── src/main/resources/application.yml
-│   ├── pom.xml
-│   └── Dockerfile
-├── postman/
-│   └── coleccion_knowledgesort.postman_collection.json
-├── docker-compose.yml
-├── .env.example
-└── README.md
+
+Then open **http://localhost:8080**.
+
+The first start takes ~30 seconds while Maven downloads dependencies.
+
+> **Port 8080 already in use?** Stop the other process, or set `server.port=8081` in `src/main/resources/application.properties` and open that port instead.
+>
+> **To stop the app:** press `Ctrl+C` in the terminal (or the red Stop button if you launched from your IDE).
+
+## Optional upgrade — instant hotswap
+
+Running with `spring-boot:run` works, but Java code changes need a server restart. For **live reload** — edit Java, see it in the browser without restarting — install the **Vaadin plugin** and start the app through it:
+
+- **IntelliJ IDEA:** install *Vaadin* from the JetBrains Marketplace → **Debug using Hotswap Agent** (dropdown next to Run). *Just installed it? Let IntelliJ finish indexing, or restart it, if the menu item isn't there yet.*
+- **VS Code:** install the *Vaadin* extension → **Vaadin: Debug using Hotswap Agent** from the command palette.
+- **Eclipse:** install the *Vaadin* plugin → right-click the project → **Run As → Vaadin Application**.
+
+This is what makes the edit-and-see-it loop feel instant — and it's required for the AI edits in [Vaadin Copilot](https://vaadin.com/docs/latest/tools/copilot).
+
+---
+
+## Ask your AI assistant about Vaadin (optional)
+
+If you use Claude Code, Cursor, or another AI coding assistant, connect it to the **Vaadin MCP server** so it answers against real Vaadin docs and the exact API of your installed version — instead of guessing from outdated training data.
+
+```bash
+# One-time setup — see https://vaadin.com/docs/latest/building-apps/mcp
 ```
+
+A `.mcp.json` is included (commented out by default). Uncomment it, or run the setup command above, to activate.
+
+---
+
+## Build for production
+
+```bash
+./mvnw package
+java -jar target/*.jar
+```
+
+## Run with Docker
+
+This project now includes a portable Docker setup for easier sharing and deployment.
+
+### Build the image
+
+```bash
+docker build -t logicore-app .
+```
+
+### Run the container
+
+```bash
+docker run -p 8080:8080 --name logicore-app logicore-app
+```
+
+### Run with Docker Compose
+
+```bash
+docker compose up --build
+```
+
+### Publish to GitHub
+
+1. Create a new public GitHub repository.
+2. Push the project to the repository.
+3. Add a short description and choose the license.
+4. Optionally add a GitHub Actions workflow to build the Docker image automatically.
+
+## Learn more
+
+- [Vaadin Quickstart](https://vaadin.com/quickstart) — the 5-minute getting-started path
+- [Components](https://vaadin.com/docs/latest/components) — 50+ UI components, all callable from Java
+- [Vaadin Copilot](https://vaadin.com/docs/latest/tools/copilot) — visual + AI editing in the browser
+- [Full documentation](https://vaadin.com/docs)

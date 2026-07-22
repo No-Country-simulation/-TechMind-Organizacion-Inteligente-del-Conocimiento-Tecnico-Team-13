@@ -1,9 +1,0 @@
-com/hackaton/logicore/security/JwtService.class
-com/hackaton/logicore/security/SecurityConfig.class
-com/hackaton/logicore/controller/UserController.class
-com/hackaton/logicore/repository/UserRepository.class
-com/hackaton/logicore/config/OpenApiConfig.class
-com/hackaton/logicore/controller/AuthController.class
-com/hackaton/logicore/entity/User.class
-com/hackaton/logicore/LogicoreApplication.class
-com/hackaton/logicore/security/JwtAuthenticationFilter.class
