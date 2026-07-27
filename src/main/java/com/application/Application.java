@@ -6,11 +6,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import com.vaadin.flow.component.dependency.StyleSheet;
 import com.vaadin.flow.component.page.AppShellConfigurator;
 import com.vaadin.flow.component.page.Push;
-import com.vaadin.flow.theme.Theme;
 
 @SpringBootApplication
-@Theme(value = "lumo") // Establece Lumo como el tema principal
-@StyleSheet("styles.css") // Tus estilos personalizados se mantienen
+@StyleSheet("styles.css")
 @Push
 public class Application implements AppShellConfigurator {
 
