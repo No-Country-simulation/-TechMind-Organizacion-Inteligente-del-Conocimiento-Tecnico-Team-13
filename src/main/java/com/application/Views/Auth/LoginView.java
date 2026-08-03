@@ -14,6 +14,7 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
@@ -111,7 +112,10 @@ public class LoginView extends VerticalLayout {
         actionsRow.setSpacing(true);
         actionsRow.setAlignItems(FlexComponent.Alignment.CENTER);
 
-        Button signInButton = new Button("Sign in", event -> UI.getCurrent().navigate(DashboardView.class));
+        Button signInButton = new Button("Sign in", event -> {
+            Notification.show("Login attempt received. Redirecting to the dashboard.");
+            UI.getCurrent().navigate(DashboardView.class);
+        });
         signInButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         signInButton.addClassName("sign-in-button");
 
