@@ -1,1 +1,28 @@
+# Archivos de compilacion Maven / Gradle
+target/
+build/
+*.jar
+*.war
+
+# Dependencias y archivos generados por frontend/Vaadin
+node_modules/
+**/node_modules/
+frontend/generated/
+**/frontend/generated/
+src/main/frontend/generated/
+**/src/main/frontend/generated/
+vite.generated.ts
+**/vite.generated.ts
+
+# Entorno e IDEs
 .idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Configuracion local y secretos
+application-local.properties
+.env
+
+# Archivos auxiliares locales
+exclude.txt
