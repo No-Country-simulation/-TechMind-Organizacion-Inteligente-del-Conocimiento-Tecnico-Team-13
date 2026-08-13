@@ -1,0 +1,25 @@
+# Archivos de credenciales locales
+src/main/resources/application-local.properties
+
+# Archivos de configuración de IDEs
+.idea/
+*.iml
+*.iws
+.classpath
+.project
+.settings/
+
+# Archivos generados por Maven/Gradle
+target/
+build/
+
+# Logs
+*.log
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos generados por Vaadin
+frontend/generated/
+/node_modules/
