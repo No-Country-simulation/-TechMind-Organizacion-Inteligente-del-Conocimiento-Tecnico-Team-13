@@ -12,3 +12,11 @@
 node_modules/
 src/main/frontend/generated/
 vite.generated.ts
+# Archivos de compilación Maven / Gradle
+build/
+*.jar
+*.war
+
+# Configuración local y secretos
+application-local.properties
+.env
