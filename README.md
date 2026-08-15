@@ -82,3 +82,4 @@ knowledgesort/
 ├── .env.example
 └── README.md
 ```
+<img width="839" height="462" alt="image" src="https://github.com/user-attachments/assets/4922aad1-c0e7-45e9-b56e-96975920812d" />
