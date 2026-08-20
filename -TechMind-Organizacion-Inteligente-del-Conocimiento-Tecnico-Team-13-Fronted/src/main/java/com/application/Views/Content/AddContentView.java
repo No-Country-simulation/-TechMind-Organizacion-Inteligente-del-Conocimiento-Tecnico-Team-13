@@ -1,16 +1,20 @@
 package com.application.Views.Content;
 
+import com.application.Views.Layout.MainLayout;
+import com.application.dto.ContenidoRequestDTO;
+import com.application.dto.ContenidoResponseDTO;
 import com.application.events.ContentAddedEvent;
 import com.application.model.User;
+import com.application.service.ContenidoService;
 import com.application.service.SupabaseService;
 import com.application.service.UserSession;
-import com.application.Views.Layout.MainLayout;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
@@ -24,11 +28,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @PageTitle("Add Content - KnowBase")
 @Route(value = "add-content", layout = MainLayout.class)
 public class AddContentView extends VerticalLayout {
 
+    private final ContenidoService contenidoService;
     private final SupabaseService supabaseService;
     private final UserSession userSession;
     private final UUID currentUserId;
@@ -43,8 +49,17 @@ public class AddContentView extends VerticalLayout {
     private String detectedFileType = "texto_plano";
     private HorizontalLayout inputsRow;
 
+    // Panel de vista previa de análisis IA
+    private VerticalLayout analysisPanel;
+    private Span analysisPlaceholder;
+    private Span categoriaPill;
+    private FlexLayout palabrasClaveLayout;
+    private VerticalLayout relacionadosLayout;
 
-    public AddContentView(SupabaseService supabaseService, UserSession userSession, ApplicationEventPublisher eventPublisher) {
+
+    public AddContentView(ContenidoService contenidoService, SupabaseService supabaseService,
+                           UserSession userSession, ApplicationEventPublisher eventPublisher) {
+        this.contenidoService = contenidoService;
         this.supabaseService = supabaseService;
         this.userSession = userSession;
         this.eventPublisher = eventPublisher;
@@ -59,7 +74,7 @@ public class AddContentView extends VerticalLayout {
                     .addThemeVariants(NotificationVariant.LUMO_ERROR);
             setEnabled(false);
         }
-        
+
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -90,7 +105,7 @@ public class AddContentView extends VerticalLayout {
         header.add(titleLayout);
         return header;
     }
-    
+
     private HorizontalLayout createTabsSection() {
         HorizontalLayout tabs = new HorizontalLayout();
         tabs.setSpacing(true);
@@ -233,28 +248,42 @@ public class AddContentView extends VerticalLayout {
             return;
         }
 
+        if (textArea.getValue() == null || textArea.getValue().isBlank()) {
+            Notification.show("Debes escribir o pegar el texto a procesar", 3000, Notification.Position.MIDDLE)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            return;
+        }
+
         try {
             String title = titleField.getValue();
-            UUID newContentId = supabaseService.registerContentRecord(
-                    currentUserId,
-                    title,
-                    detectedFileType,
-                    textArea.getValue(),
-                    uploadedStoragePath
-            );
+            ContenidoRequestDTO request = new ContenidoRequestDTO(title, textArea.getValue());
 
-            Notification.show("Contenido registrado exitosamente (ID: " + newContentId + ")", 4000, Notification.Position.BOTTOM_END)
+            // Clasificación (FastAPI) + embedding (OpenAI) + detección de casi-duplicados + persistencia.
+            ContenidoService.GuardadoResult resultado = contenidoService.procesarYGuardar(
+                    currentUserId, request, detectedFileType, uploadedStoragePath);
+
+            showAnalysisPreview(resultado.contenido());
+
+            if (!resultado.posiblesDuplicados().isEmpty()) {
+                String detalle = resultado.posiblesDuplicados().stream()
+                        .map(d -> String.format("\"%s\" (%.0f%% parecido)", d.titulo(), d.similitud() * 100))
+                        .collect(Collectors.joining(", "));
+                Notification.show("Aviso: este contenido se parece a lo ya guardado: " + detalle, 7000, Notification.Position.BOTTOM_END)
+                        .addThemeVariants(NotificationVariant.LUMO_CONTRAST);
+            }
+
+            Notification.show("Contenido registrado exitosamente (ID: " + resultado.contenido().id() + ")", 4000, Notification.Position.BOTTOM_END)
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            
-            eventPublisher.publishEvent(new ContentAddedEvent(this, newContentId, title));
+
+            eventPublisher.publishEvent(new ContentAddedEvent(this, resultado.contenido().id(), title));
 
             textArea.clear();
             titleField.clear();
-            
+
             inputsRow.remove(upload);
             createUploadComponent();
             inputsRow.add(upload);
-            
+
             uploadedStoragePath = null;
             detectedFileType = "texto_plano";
 
@@ -275,8 +304,69 @@ public class AddContentView extends VerticalLayout {
 
         Span title = new Span("Vista previa de análisis IA");
         title.getStyle().set("font-weight", "700").set("font-size", "14px");
-        panel.add(title);
 
+        analysisPlaceholder = new Span("Procesa un contenido para ver aquí la categoría, palabras clave y contenido relacionado.");
+        analysisPlaceholder.getStyle().set("color", "#94a3b8").set("font-size", "13px").set("margin-top", "10px");
+
+        categoriaPill = new Span();
+        categoriaPill.getStyle()
+                .set("background-color", "#00b8941A")
+                .set("color", "#00b894")
+                .set("font-size", "12px")
+                .set("font-weight", "700")
+                .set("padding", "4px 12px")
+                .set("border-radius", "12px")
+                .set("display", "none");
+
+        palabrasClaveLayout = new FlexLayout();
+        palabrasClaveLayout.getStyle().set("gap", "6px").set("flex-wrap", "wrap").set("margin-top", "10px");
+
+        relacionadosLayout = new VerticalLayout();
+        relacionadosLayout.setPadding(false);
+        relacionadosLayout.setSpacing(false);
+        relacionadosLayout.getStyle().set("margin-top", "10px");
+
+        analysisPanel = new VerticalLayout(categoriaPill, palabrasClaveLayout, relacionadosLayout);
+        analysisPanel.setPadding(false);
+        analysisPanel.setSpacing(false);
+
+        panel.add(title, analysisPlaceholder, analysisPanel);
         return panel;
+    }
+
+    private void showAnalysisPreview(ContenidoResponseDTO contenido) {
+        analysisPlaceholder.setVisible(false);
+
+        if (contenido.categoria() != null) {
+            categoriaPill.setText("• " + contenido.categoria());
+            categoriaPill.getStyle().set("display", "inline-block");
+        } else {
+            categoriaPill.setText("Sin clasificar (clasificador no disponible)");
+            categoriaPill.getStyle().set("display", "inline-block");
+        }
+
+        palabrasClaveLayout.removeAll();
+        contenido.palabrasClave().forEach(palabra -> {
+            Span chip = new Span(palabra);
+            chip.getStyle()
+                    .set("background-color", "#f1f5f9")
+                    .set("color", "#475569")
+                    .set("font-size", "11px")
+                    .set("padding", "3px 10px")
+                    .set("border-radius", "6px");
+            palabrasClaveLayout.add(chip);
+        });
+
+        relacionadosLayout.removeAll();
+        if (!contenido.contenidosRelacionados().isEmpty()) {
+            Span relacionadosTitle = new Span("Contenido relacionado:");
+            relacionadosTitle.getStyle().set("font-weight", "600").set("font-size", "12px").set("color", "#334155");
+            relacionadosLayout.add(relacionadosTitle);
+            contenido.contenidosRelacionados().forEach(titulo -> {
+                Span item = new Span("• " + titulo);
+                item.getStyle().set("font-size", "12px").set("color", "#64748b");
+                relacionadosLayout.add(item);
+            });
+        }
     }
 }

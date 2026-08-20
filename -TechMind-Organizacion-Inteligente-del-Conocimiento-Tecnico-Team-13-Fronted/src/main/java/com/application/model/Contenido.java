@@ -1,60 +1,83 @@
 package com.application.model;
 
-import jakarta.persistence.*;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.ArrayList;
+import com.application.model.support.VectorType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Tabla unica de contenido tecnico: reemplaza la antigua tabla "contenidos" (accedida por REST
+ * desde SupabaseService) y la entidad "Contenido" original que nunca se conecto a ningun flujo.
+ */
 @Entity
-@Table(name = "contenido")
+@Table(name = "contenido", schema = "public")
 public class Contenido {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
+
+    @Column(nullable = false, length = 200)
     private String titulo;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String texto;
 
+    @Column(name = "tipo_contenido", nullable = false, length = 50)
+    private String tipoContenido = "texto_plano";
+
+    @Column(name = "storage_path")
+    private String storagePath;
+
+    @Column(name = "estado_procesamiento", nullable = false, length = 30)
+    private String estadoProcesamiento = "pendiente";
+
+    @Column(length = 100)
     private String categoria;
 
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "contenido_palabras_clave", joinColumns = @JoinColumn(name = "contenido_id"))
-    @Column(name = "palabra_clave")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "palabras_clave", columnDefinition = "text[]")
     private List<String> palabrasClave = new ArrayList<>();
 
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "contenido_relacionados", joinColumns = @JoinColumn(name = "contenido_id"))
-    @Column(name = "contenido_relacionado")
-    private List<String> contenidosRelacionados = new ArrayList<>();
+    @Type(VectorType.class)
+    @Column(columnDefinition = "vector(1536)")
+    private float[] embedding;
 
     @Column(name = "fecha_creacion", nullable = false)
-    private LocalDateTime fechaCreacion;
+    private OffsetDateTime fechaCreacion;
 
-    // Constructors
     public Contenido() {
-        this.fechaCreacion = LocalDateTime.now();
+        this.fechaCreacion = OffsetDateTime.now();
     }
 
-    public Contenido(String titulo, String texto, String categoria, List<String> palabrasClave, List<String> contenidosRelacionados) {
-        this.titulo = titulo;
-        this.texto = texto;
-        this.categoria = categoria;
-        this.palabrasClave = palabrasClave != null ? new ArrayList<>(palabrasClave) : new ArrayList<>();
-        this.contenidosRelacionados = contenidosRelacionados != null ? new ArrayList<>(contenidosRelacionados) : new ArrayList<>();
-        this.fechaCreacion = LocalDateTime.now();
-    }
-
-    // Getters and Setters
     public Long getId() {
         return id;
     }
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public void setUserId(UUID userId) {
+        this.userId = userId;
     }
 
     public String getTitulo() {
@@ -73,6 +96,30 @@ public class Contenido {
         this.texto = texto;
     }
 
+    public String getTipoContenido() {
+        return tipoContenido;
+    }
+
+    public void setTipoContenido(String tipoContenido) {
+        this.tipoContenido = tipoContenido;
+    }
+
+    public String getStoragePath() {
+        return storagePath;
+    }
+
+    public void setStoragePath(String storagePath) {
+        this.storagePath = storagePath;
+    }
+
+    public String getEstadoProcesamiento() {
+        return estadoProcesamiento;
+    }
+
+    public void setEstadoProcesamiento(String estadoProcesamiento) {
+        this.estadoProcesamiento = estadoProcesamiento;
+    }
+
     public String getCategoria() {
         return categoria;
     }
@@ -86,22 +133,22 @@ public class Contenido {
     }
 
     public void setPalabrasClave(List<String> palabrasClave) {
-        this.palabrasClave = palabrasClave != null ? new ArrayList<>(palabrasClave) : new ArrayList<>();
+        this.palabrasClave = palabrasClave != null ? palabrasClave : new ArrayList<>();
     }
 
-    public List<String> getContenidosRelacionados() {
-        return contenidosRelacionados;
+    public float[] getEmbedding() {
+        return embedding;
     }
 
-    public void setContenidosRelacionados(List<String> contenidosRelacionados) {
-        this.contenidosRelacionados = contenidosRelacionados != null ? new ArrayList<>(contenidosRelacionados) : new ArrayList<>();
+    public void setEmbedding(float[] embedding) {
+        this.embedding = embedding;
     }
 
-    public LocalDateTime getFechaCreacion() {
+    public OffsetDateTime getFechaCreacion() {
         return fechaCreacion;
     }
 
-    public void setFechaCreacion(LocalDateTime fechaCreacion) {
+    public void setFechaCreacion(OffsetDateTime fechaCreacion) {
         this.fechaCreacion = fechaCreacion;
     }
 }

@@ -24,4 +24,12 @@ public class GlobalExceptionHandler {
         errors.put("detalles", details);
         return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler(ModeloServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleModeloServiceException(ModeloServiceException ex) {
+        Map<String, Object> errors = new HashMap<>();
+        errors.put("error", "Servicio de IA no disponible");
+        errors.put("detalles", List.of(ex.getMessage()));
+        return new ResponseEntity<>(errors, HttpStatus.SERVICE_UNAVAILABLE);
+    }
 }

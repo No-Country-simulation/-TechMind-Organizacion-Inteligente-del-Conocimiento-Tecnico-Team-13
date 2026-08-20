@@ -1,6 +1,9 @@
 package com.application.Views.Auth;
 
 import com.application.Views.Dashboard.DashboardView;
+import com.application.exception.EmailNotConfirmedException;
+import com.application.exception.SupabaseAuthException;
+import com.application.exception.SupabaseRateLimitException;
 import com.application.service.AuthService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -10,20 +13,24 @@ import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 @Route("")
 @PageTitle("Login | Logicore")
 @AnonymousAllowed
-public class LoginView extends VerticalLayout {
+public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
     private final AuthService authService;
     private VerticalLayout loginForm;
@@ -56,6 +63,15 @@ public class LoginView extends VerticalLayout {
         // Paneles
         cardContainer.add(createLeftPanel(), createRightPanel());
         add(cardContainer);
+    }
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        List<String> confirmed = event.getLocation().getQueryParameters().getParameters().get("confirmed");
+        if (confirmed != null && confirmed.contains("true")) {
+            Notification.show("¡Correo confirmado con éxito! Ya puedes iniciar sesión.", 4000, Notification.Position.TOP_CENTER)
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+        }
     }
 
     private VerticalLayout createLeftPanel() {
@@ -158,10 +174,15 @@ public class LoginView extends VerticalLayout {
                 Notification.show("Username and password are required.", 3000, Notification.Position.TOP_CENTER);
                 return;
             }
-            if (authService.authenticate(username, password) != null) {
-                UI.getCurrent().navigate(DashboardView.class);
-            } else {
-                Notification.show("Invalid username or password.", 3000, Notification.Position.TOP_CENTER);
+            try {
+                if (authService.authenticate(username, password) != null) {
+                    UI.getCurrent().navigate(DashboardView.class);
+                } else {
+                    Notification.show("Invalid username or password.", 3000, Notification.Position.TOP_CENTER);
+                }
+            } catch (EmailNotConfirmedException e) {
+                Notification.show("Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.", 5000, Notification.Position.TOP_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });
         signInBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -211,11 +232,17 @@ public class LoginView extends VerticalLayout {
             if (!validateInput(nombre, username, password)) {
                 return;
             }
-            if (authService.register(username, password, nombre) != null) {
-                Notification.show("Account created successfully. Please log in.", 3000, Notification.Position.TOP_CENTER);
-                showLoginForm();
-            } else {
-                Notification.show("Username already exists.", 3000, Notification.Position.TOP_CENTER);
+            try {
+                if (authService.register(username, password, nombre) != null) {
+                    Notification.show("Cuenta creada. Revisa tu correo para confirmar tu cuenta antes de iniciar sesión.", 5000, Notification.Position.TOP_CENTER)
+                            .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                    showLoginForm();
+                } else {
+                    Notification.show("Username already exists.", 3000, Notification.Position.TOP_CENTER);
+                }
+            } catch (SupabaseRateLimitException | SupabaseAuthException e) {
+                Notification.show(e.getMessage(), 5000, Notification.Position.TOP_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });
         registerButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);

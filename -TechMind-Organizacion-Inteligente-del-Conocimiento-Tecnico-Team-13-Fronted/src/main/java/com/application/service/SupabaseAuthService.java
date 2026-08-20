@@ -1,13 +1,18 @@
 package com.application.service;
 
+import com.application.exception.EmailNotConfirmedException;
+import com.application.exception.SupabaseAuthException;
+import com.application.exception.SupabaseRateLimitException;
 import com.application.model.AuthResponse;
 import com.application.model.SupabaseUser;
 import com.application.model.User;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,17 +23,23 @@ public class SupabaseAuthService {
 
     private final RestTemplate restTemplate;
     private final UserSession userSession;
+    private final ObjectMapper objectMapper;
     private final String supabaseUrl;
     private final String supabaseApiKey;
+    private final String appBaseUrl;
 
     public SupabaseAuthService(RestTemplate restTemplate,
                                UserSession userSession,
+                               ObjectMapper objectMapper,
                                @Value("${supabase.url}") String supabaseUrl,
-                               @Value("${supabase.api-key}") String supabaseApiKey) {
+                               @Value("${supabase.api-key}") String supabaseApiKey,
+                               @Value("${app.base-url}") String appBaseUrl) {
         this.restTemplate = restTemplate;
         this.userSession = userSession;
+        this.objectMapper = objectMapper;
         this.supabaseUrl = supabaseUrl;
         this.supabaseApiKey = supabaseApiKey;
+        this.appBaseUrl = appBaseUrl;
     }
 
     public User signIn(String email, String password) {
@@ -57,13 +68,18 @@ public class SupabaseAuthService {
             }
             return null;
         } catch (HttpClientErrorException e) {
-            // Log exception e.getResponseBodyAsString()
+            String errorBody = e.getResponseBodyAsString();
+            if (errorBody != null && (errorBody.contains("email_not_confirmed") || errorBody.toLowerCase().contains("not confirmed"))) {
+                throw new EmailNotConfirmedException("Debes confirmar tu correo antes de iniciar sesión.");
+            }
             return null;
         }
     }
 
     public User signUp(String email, String password, String nombre) {
-        String url = supabaseUrl + "/auth/v1/signup";
+        String url = UriComponentsBuilder.fromHttpUrl(supabaseUrl + "/auth/v1/signup")
+                .queryParam("redirect_to", appBaseUrl + "/?confirmed=true")
+                .toUriString();
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", supabaseApiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -79,23 +95,42 @@ public class SupabaseAuthService {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
-            ResponseEntity<SupabaseUser> response = restTemplate.postForEntity(url, request, SupabaseUser.class);
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                SupabaseUser supabaseUser = response.getBody();
-                User user = new User();
-                user.setId(UUID.fromString(supabaseUser.getId()));
-                user.setEmail(supabaseUser.getEmail());
-                user.setNombre(supabaseUser.getNombre());
-                // Note: SignUp might not automatically sign in.
-                // Depending on Supabase settings (e.g., email confirmation),
-                // a separate signIn call might be needed.
-                // For simplicity here, we'll consider the user signed in.
-                userSession.setAuthenticatedUser(user);
-                return user;
+            // Supabase returns the user object at the root when confirmation is
+            // pending, or wrapped under "user" (alongside a session) when the
+            // project has email auto-confirm enabled. Parse both shapes.
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+            Map<String, Object> responseBody = response.getBody();
+            if (response.getStatusCode() != HttpStatus.OK || responseBody == null) {
+                return null;
             }
-            return null;
+
+            Object userNode = responseBody.containsKey("user") ? responseBody.get("user") : responseBody;
+            SupabaseUser supabaseUser = objectMapper.convertValue(userNode, SupabaseUser.class);
+            if (supabaseUser == null || supabaseUser.getId() == null) {
+                return null;
+            }
+
+            User user = new User();
+            user.setId(UUID.fromString(supabaseUser.getId()));
+            user.setEmail(supabaseUser.getEmail());
+            user.setNombre(supabaseUser.getNombre());
+
+            // Only auto-login if Supabase actually issued a session
+            // (i.e. email confirmation is not required).
+            if (responseBody.get("access_token") != null) {
+                userSession.setAuthenticatedUser(user);
+            }
+            return user;
         } catch (HttpClientErrorException e) {
-            // Log exception e.getResponseBodyAsString()
+            String errorBody = e.getResponseBodyAsString();
+            System.err.println("Supabase signUp error [" + e.getStatusCode() + "]: " + errorBody);
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS
+                    || (errorBody != null && errorBody.toLowerCase().contains("rate limit"))) {
+                throw new SupabaseRateLimitException("Se alcanzó el límite de correos de confirmación. Espera unos minutos y vuelve a intentar.");
+            }
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED || e.getStatusCode() == HttpStatus.FORBIDDEN) {
+                throw new SupabaseAuthException("No se pudo conectar con Supabase (configuración de API key inválida). Contacta al administrador.");
+            }
             return null;
         }
     }

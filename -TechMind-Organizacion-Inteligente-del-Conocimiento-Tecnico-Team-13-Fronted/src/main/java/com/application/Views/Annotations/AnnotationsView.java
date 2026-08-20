@@ -1,8 +1,8 @@
 package com.application.Views.Annotations;
 
-import com.application.model.Content;
+import com.application.model.Contenido;
 import com.application.model.User;
-import com.application.service.SupabaseService;
+import com.application.service.ContenidoService;
 import com.application.service.UserSession;
 import com.application.Views.Layout.MainLayout;
 import com.vaadin.flow.component.html.*;
@@ -24,13 +24,13 @@ import java.util.UUID;
 @Route(value = "annotations", layout = MainLayout.class)
 public class AnnotationsView extends VerticalLayout implements BeforeEnterObserver {
 
-    private final SupabaseService supabaseService;
+    private final ContenidoService contenidoService;
     private final UserSession userSession;
     private VerticalLayout annotationsList;
     private H3 totalStatValue;
 
-    public AnnotationsView(SupabaseService supabaseService, UserSession userSession) {
-        this.supabaseService = supabaseService;
+    public AnnotationsView(ContenidoService contenidoService, UserSession userSession) {
+        this.contenidoService = contenidoService;
         this.userSession = userSession;
 
         setSizeFull();
@@ -74,8 +74,8 @@ public class AnnotationsView extends VerticalLayout implements BeforeEnterObserv
 
         UUID userId = maybeUser.get().getId();
 
-        // Cargar contenidos desde Supabase
-        List<Content> contents = supabaseService.getContentsForUser(userId);
+        // Cargar contenidos desde la tabla contenido (Supabase Postgres, vía JPA)
+        List<Contenido> contents = contenidoService.listarPorUsuario(userId);
         annotationsList.removeAll();
 
         if (contents == null || contents.isEmpty()) {
@@ -88,9 +88,9 @@ public class AnnotationsView extends VerticalLayout implements BeforeEnterObserv
         totalStatValue.setText(String.valueOf(contents.size()));
 
         contents.forEach(content -> {
-            String timeAgo = formatTimeAgo(content.getCreatedAt());
-            String snippet = content.getTextoPlano() != null && !content.getTextoPlano().isBlank()
-                    ? content.getTextoPlano()
+            String timeAgo = formatTimeAgo(content.getFechaCreacion());
+            String snippet = content.getTexto() != null && !content.getTexto().isBlank()
+                    ? content.getTexto()
                     : "Archivo adjunto: " + content.getStoragePath();
 
             annotationsList.add(

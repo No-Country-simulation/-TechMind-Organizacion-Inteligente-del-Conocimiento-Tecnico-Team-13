@@ -1,8 +1,8 @@
 package com.application.Views.Library;
 
-import com.application.model.Content;
+import com.application.model.Contenido;
 import com.application.model.User;
-import com.application.service.SupabaseService;
+import com.application.service.ContenidoService;
 import com.application.service.UserSession;
 import com.application.Views.Layout.MainLayout;
 import com.vaadin.flow.component.Component;
@@ -33,12 +33,12 @@ import java.util.UUID;
 @Route(value = "library", layout = MainLayout.class)
 public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
 
-    private final SupabaseService supabaseService;
+    private final ContenidoService contenidoService;
     private final UserSession userSession;
     private Div cardsGrid; // Made a field to allow dynamic updates
 
-    public LibraryView(SupabaseService supabaseService, UserSession userSession) {
-        this.supabaseService = supabaseService;
+    public LibraryView(ContenidoService contenidoService, UserSession userSession) {
+        this.contenidoService = contenidoService;
         this.userSession = userSession;
 
         setWidthFull();
@@ -84,7 +84,7 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
         UUID userId = maybeUser.get().getId();
 
         getUI().ifPresent(ui -> ui.access(() -> {
-            List<Content> contents = supabaseService.getContentsForUser(userId);
+            List<Contenido> contents = contenidoService.listarPorUsuario(userId);
             cardsGrid.removeAll();
 
             if (contents == null || contents.isEmpty()) {
@@ -94,25 +94,29 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
             }
 
             contents.forEach(content -> {
-                String timeAgo = formatTimeAgo(content.getCreatedAt());
-                String description = content.getTextoPlano() != null && !content.getTextoPlano().isBlank()
-                        ? content.getTextoPlano()
+                String timeAgo = formatTimeAgo(content.getFechaCreacion());
+                String description = content.getTexto() != null && !content.getTexto().isBlank()
+                        ? content.getTexto()
                         : "Archivo adjunto: " + content.getStoragePath();
-                
-                // Determine category and color based on tipoContenido
-                String category = content.getTipoContenido() != null ? content.getTipoContenido() : "General";
+
+                // La categoría real la pone el clasificador de IA; si aún no está disponible,
+                // caemos al tipo de contenido (texto_plano, pdf, etc.) como antes.
+                String category = content.getCategoria() != null ? content.getCategoria()
+                        : (content.getTipoContenido() != null ? content.getTipoContenido() : "General");
                 String color = getColorForCategory(category);
-                
-                // Assuming isVerified and aiReady based on some logic, or default
-                boolean isVerified = false; 
-                boolean aiReady = true; // Assuming AI processing is part of content creation
-                
+
+                boolean isVerified = false;
+                boolean aiReady = content.getCategoria() != null;
+
+                List<String> tags = content.getPalabrasClave() != null && !content.getPalabrasClave().isEmpty()
+                        ? content.getPalabrasClave()
+                        : Collections.singletonList(category);
+
                 cardsGrid.add(createCard(category, color, isVerified, timeAgo,
-                        content.getTitulo() != null ? content.getTitulo() : "Sin título", 
-                        description, 
-                        // Tags could be parsed from somewhere or default to category
-                        Collections.singletonList(category), 
-                        content.getTipoContenido(), 
+                        content.getTitulo() != null ? content.getTitulo() : "Sin título",
+                        description,
+                        tags,
+                        content.getTipoContenido(),
                         aiReady));
             });
         }));

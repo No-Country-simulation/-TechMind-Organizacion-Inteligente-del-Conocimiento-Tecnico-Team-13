@@ -59,6 +59,21 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
 
+        <!-- Migraciones de esquema versionadas (pgvector extension, tabla contenido, indices).
+             Spring Boot 3.1.x gestiona Flyway 9.16.x, que aun trae el soporte de Postgres
+             incluido en flyway-core (el modulo flyway-database-postgresql aparece recien en Flyway 10). -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
+        <!-- Tipo de columna pgvector mapeado a Hibernate 6 (embeddings de OpenAI) -->
+        <dependency>
+            <groupId>com.pgvector</groupId>
+            <artifactId>pgvector</artifactId>
+            <version>0.1.6</version>
+        </dependency>
+
         <dependency>
             <groupId>com.vaadin</groupId>
             <!-- Replace artifactId with vaadin-core to use only free components -->
@@ -76,6 +91,23 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Integración: Postgres real con pgvector vía Testcontainers (requiere Docker local/CI) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
