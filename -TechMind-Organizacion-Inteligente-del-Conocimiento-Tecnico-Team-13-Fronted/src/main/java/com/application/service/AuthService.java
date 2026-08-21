@@ -1,15 +1,7 @@
 package com.application.service;
 
-import com.application.model.Role;
-import com.application.model.RoleType;
 import com.application.model.User;
-import com.application.repository.RoleRepository;
-import com.application.repository.UserRepository;
 import org.springframework.stereotype.Service;
-
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
 
 @Service
 public class AuthService {
