@@ -75,13 +75,13 @@ pero no hay `application-prod.properties` — todo se resuelve por variables de 
 correcto en producción). Crear un `.env` **en la VM, nunca commiteado** con:
 
 ```bash
-# Supabase (proyecto lweouztfnjubsgdztgrz)
-SUPABASE_URL=https://lweouztfnjubsgdztgrz.supabase.co
+# Supabase (proyecto bnaqxitmvgmspufbkpvt)
+SUPABASE_URL=https://bnaqxitmvgmspufbkpvt.supabase.co
 SUPABASE_API_KEY=sb_publishable_...
 SUPABASE_SERVICE_KEY=sb_secret_...
-SUPABASE_JWKS_URL=https://lweouztfnjubsgdztgrz.supabase.co/auth/v1/.well-known/jwks.json
-DB_URL=jdbc:postgresql://<host-pooler>.pooler.supabase.com:5432/postgres?sslmode=require
-DB_USERNAME=postgres.lweouztfnjubsgdztgrz
+SUPABASE_JWKS_URL=https://bnaqxitmvgmspufbkpvt.supabase.co/auth/v1/.well-known/jwks.json
+DB_URL=jdbc:postgresql://aws-0-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require
+DB_USERNAME=postgres.bnaqxitmvgmspufbkpvt
 DB_PASSWORD=...
 
 # FastAPI del clasificador (nombre del servicio en docker-compose, ver abajo)
