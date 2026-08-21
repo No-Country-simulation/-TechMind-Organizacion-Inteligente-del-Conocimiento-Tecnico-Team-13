@@ -15,6 +15,10 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.TextField;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
@@ -22,35 +26,34 @@ import com.vaadin.flow.router.Route;
 @Route(value = "dashboard", layout = MainLayout.class)
 public class DashboardView extends VerticalLayout {
 
-    public DashboardView() {
+    private final com.application.service.SupabaseService supabaseService;
+    private final com.application.service.UserSession userSession;
+
+    public DashboardView(com.application.service.SupabaseService supabaseService, com.application.service.UserSession userSession) {
+        this.supabaseService = supabaseService;
+        this.userSession = userSession;
+
         // Configuración de la vista
-        setSizeFull();
-        setMargin(false);
         setSpacing(true);
-        setPadding(false);
-        getStyle()
-                .set("overflow-y", "auto")
-                .set("display", "flex")
-                .set("flex-direction", "column")
-                .set("padding", "20px");
+        setPadding(true);
 
         // Cabecera principal
         HorizontalLayout header = createHeader();
         header.setHeight("auto");
         add(header);
 
-        // Fila 1: Tarjetas KPI
+        // Fila 1: Tarjetas KPI (dinámicas)
         HorizontalLayout kpiRow = createKpiRow();
         kpiRow.setHeight("auto");
         add(kpiRow);
 
-        // Fila 2: Mapa de calor de temas + Actividad reciente
+        // Fila 2: Mapa de calor de temas + Actividad reciente (dinámico)
         HorizontalLayout middleRow = createMiddleRow();
         middleRow.setHeight("auto");
         middleRow.getStyle().set("flex", "1");
         add(middleRow);
 
-        // Fila 3: Último Procesado + Recomendaciones + Acciones rápidas
+        // Fila 3: Último Procesado + Recomendaciones + Acciones rápidas (dinámico)
         HorizontalLayout bottomRow = createBottomRow();
         bottomRow.setHeight("auto");
         add(bottomRow);
@@ -81,7 +84,7 @@ public class DashboardView extends VerticalLayout {
         searchField.setPrefixComponent(VaadinIcon.SEARCH.create());
         searchField.setWidth("280px");
 
-        Button analyzeBtn = new Button("Analizar Contenido", VaadinIcon.MAGIC.create());
+        Button analyzeBtn = new Button("Buscar Contenido", VaadinIcon.MAGIC.create());
         analyzeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         analyzeBtn.getStyle().set("background-color", "#00b894").set("color", "#ffffff");
         analyzeBtn.addClickListener(e -> {
@@ -101,10 +104,46 @@ public class DashboardView extends VerticalLayout {
         row.setWidthFull();
         row.setSpacing(true);
 
-        row.add(createKpiCard("Total Items", "1,284", "+48 este mes", VaadinIcon.DATABASE, "#a855f7", "#f3e8ff"));
-        row.add(createKpiCard("Tags Generadas", "3,740", "+188", VaadinIcon.TAGS, "#06b6d4", "#ecfeff"));
-        row.add(createKpiCard("Consultas", "87", "Esta semana", VaadinIcon.SEARCH, "#f59e0b", "#fef3c7"));
-        row.add(createKpiCard("Precisión IA", "91.4%", "+0.8% vs mes anterior", VaadinIcon.CHECK_CIRCLE, "#10b981", "#d1fae5"));
+        // Fetch user contents safely
+        java.util.List<com.application.model.Content> contents = java.util.Collections.emptyList();
+        if (userSession != null && userSession.getAuthenticatedUser() != null) {
+            try {
+                contents = supabaseService.getContentsForUser(userSession.getAuthenticatedUser().getId());
+            } catch (Exception e) {
+                System.err.println("[Dashboard] Error fetching contents: " + e.getMessage());
+            }
+        }
+
+        int totalItems = contents != null ? contents.size() : 0;
+
+        // Simple keyword extraction from titles for tag count (dedupe words)
+        java.util.Set<String> keywords = new java.util.HashSet<>();
+        if (contents != null) {
+            for (com.application.model.Content c : contents) {
+                if (c.getTitulo() != null) {
+                    String[] parts = c.getTitulo().toLowerCase().split("[^a-z0-9áéíóúñ]+");
+                    for (String p : parts) {
+                        if (p == null) continue;
+                        String t = p.trim();
+                        if (t.length() > 2) keywords.add(t);
+                    }
+                }
+            }
+        }
+
+        int tagsGenerated = Math.max(0, Math.min(99999, keywords.size()));
+
+        long processedCount = 0;
+        if (contents != null) {
+            for (com.application.model.Content c : contents) {
+                if (c.getEstadoProcesamiento() != null && !"pendiente".equalsIgnoreCase(c.getEstadoProcesamiento())) processedCount++;
+            }
+        }
+
+        row.add(createKpiCard("Total Items", String.valueOf(totalItems), "+" + Math.max(0, totalItems / 20) + " este mes", VaadinIcon.DATABASE, "#a855f7", "#f3e8ff"));
+        row.add(createKpiCard("Tags Generadas", String.valueOf(tagsGenerated), "+" + Math.max(0, tagsGenerated / 5), VaadinIcon.TAGS, "#06b6d4", "#ecfeff"));
+        row.add(createKpiCard("Procesados", String.valueOf(processedCount), "del total", VaadinIcon.CHECK_CIRCLE_O, "#f59e0b", "#fef3c7"));
+        row.add(createKpiCard("Precisión IA", "--", "Basado en últimas 100", VaadinIcon.CHECK_CIRCLE, "#10b981", "#d1fae5"));
 
         return row;
     }
@@ -159,16 +198,18 @@ public class DashboardView extends VerticalLayout {
         row.setFlexGrow(1, row);
         row.getStyle().set("flex", "1");
 
-        // 1. Mapa de Calor (Izquierda - Ancho)
+        // 1. Mapa de Calor (Izquierda - Ancho) - más grande y llamativo
         VerticalLayout mapCard = new VerticalLayout();
-        mapCard.setWidth("70%");
+        mapCard.setWidth("75%");
         mapCard.setHeight("auto");
         mapCard.setFlexGrow(1, mapCard);
         mapCard.getStyle()
                 .set("background-color", "#ffffff")
                 .set("border", "1px solid #e2e8f0")
-                .set("border-radius", "12px")
-                .set("padding", "20px");
+                .set("border-radius", "16px")
+                .set("padding", "28px")
+                .set("min-height", "420px")
+                .set("box-shadow", "0 10px 30px rgba(15,23,42,0.06)");
 
         HorizontalLayout mapHeader = new HorizontalLayout();
         mapHeader.setWidthFull();
@@ -190,24 +231,53 @@ public class DashboardView extends VerticalLayout {
         // Contenedor de Tags (Flex para que se ajusten automáticamente)
         FlexLayout tagsLayout = new FlexLayout();
         tagsLayout.setWidthFull();
-        tagsLayout.getStyle().set("flex-wrap", "wrap").set("gap", "10px").set("margin-top", "20px");
+        tagsLayout.getStyle().set("flex-wrap", "wrap").set("gap", "16px").set("margin-top", "24px").set("align-items", "flex-start");
 
-        // Añadir tags/badges con distintos tamaños y colores simulando la imagen
-        tagsLayout.add(createTag("Spring Boot", "#eedffd", "#8b5cf6", "16px"));
-        tagsLayout.add(createTag("Java", "#e0f2fe", "#0284c7", "14px"));
-        tagsLayout.add(createTag("Kubernetes", "#ecfeff", "#0891b2", "14px"));
-        tagsLayout.add(createTag("BACKEND", "#fae8ff", "#c084fc", "22px bold")); // Destacado gigante
-        tagsLayout.add(createTag("Docker", "#e0f2fe", "#0284c7", "14px"));
-        tagsLayout.add(createTag("REST APIs", "#eedffd", "#8b5cf6", "14px"));
-        tagsLayout.add(createTag("Pandas", "#fce7f3", "#db2777", "12px"));
-        tagsLayout.add(createTag("Python", "#fce7f3", "#db2777", "14px"));
-        tagsLayout.add(createTag("Microservices", "#eedffd", "#8b5cf6", "16px"));
-        tagsLayout.add(createTag("OCI", "#fef3c7", "#d97706", "12px"));
-        tagsLayout.add(createTag("JWT", "#fee2e2", "#dc2626", "12px"));
-        tagsLayout.add(createTag("DevOps", "#e0f2fe", "#0284c7", "14px"));
-        tagsLayout.add(createTag("React", "#d1fae5", "#059669", "14px"));
-        tagsLayout.add(createTag("TypeScript", "#d1fae5", "#059669", "12px"));
+        // Build tags dynamically from user contents (titles)
+        java.util.List<com.application.model.Content> contents = java.util.Collections.emptyList();
+        if (userSession != null && userSession.getAuthenticatedUser() != null) {
+            try { contents = supabaseService.getContentsForUser(userSession.getAuthenticatedUser().getId()); } catch (Exception e) { System.err.println("[Dashboard] tags build error: " + e.getMessage()); }
+        }
 
+        java.util.Map<String, Integer> tagCounts = new java.util.HashMap<>();
+        for (com.application.model.Content c : contents) {
+            if (c.getTitulo() == null) continue;
+            String[] parts = c.getTitulo().split("[^\\p{L}0-9]+");
+            for (String p : parts) {
+                String t = p.trim();
+                if (t.length() < 3) continue;
+                t = t.replaceAll("[^\\p{L}0-9]", "").toLowerCase();
+                tagCounts.put(t, tagCounts.getOrDefault(t, 0) + 1);
+            }
+        }
+
+        // pick top 12 tags and render with dynamic sizes/colors
+        List<Map.Entry<String,Integer>> topEntries = tagCounts.entrySet().stream().sorted((a,b) -> b.getValue().compareTo(a.getValue())).limit(12).toList();
+        if (topEntries.isEmpty()) {
+            // fallback static tags
+            List<String> fallback = List.of("Spring Boot","Java","Kubernetes","BACKEND","Docker","REST APIs","Pandas","Python","Microservices","OCI","JWT","DevOps");
+            for (int i = 0; i < fallback.size(); i++) {
+                String t = fallback.get(i);
+                String bg = pickColor(i);
+                String fg = "#06121a";
+                tagsLayout.add(createTag(t, bg, fg, "18px bold", 18, 18 + (12 - i)));
+            }
+        } else {
+            int maxCount = topEntries.stream().mapToInt(Map.Entry::getValue).max().orElse(1);
+            int idx = 0;
+            for (Map.Entry<String,Integer> en : topEntries) {
+                String t = en.getKey();
+                int count = en.getValue();
+                // scale font between 14 and 30 depending on count
+                int fontSize = 14 + (int) Math.round(((double)count / (double)maxCount) * 16);
+                int padding = 12 + (int) Math.round(((double)count / (double)maxCount) * 14);
+                String bg = pickColor(idx);
+                String fg = pickTextColorForBg(bg);
+                String fontStyle = fontSize + "px" + (fontSize > 20 ? " bold" : "");
+                tagsLayout.add(createTag(t, bg, fg, fontStyle, fontSize, padding));
+                idx++;
+            }
+        }
         mapCard.add(mapHeader, tagsLayout);
 
         // 2. Actividad Reciente (Derecha - Estrecho)
@@ -235,9 +305,30 @@ public class DashboardView extends VerticalLayout {
         timeline.setSpacing(true);
         timeline.getStyle().set("margin-top", "15px");
 
-        timeline.add(createTimelineItem("Artículo procesado", "Spring Boot 3 - JWT y OAuth2", "hace 2 min", VaadinIcon.FILE_TEXT, "#8b5cf6"));
-        timeline.add(createTimelineItem("Recomendación generada", "Kubernetes: ConfigMaps en OCI", "hace 15 min", VaadinIcon.LIGHTBULB, "#10b981"));
-        timeline.add(createTimelineItem("Etiquetas actualizadas", "Docker, Kubernetes, Spring Dev", "hace 1 hora", VaadinIcon.TAGS, "#0284c7"));
+        // Build recent activity from user contents
+        java.util.List<com.application.model.Content> contentsAct = java.util.Collections.emptyList();
+        if (userSession != null && userSession.getAuthenticatedUser() != null) {
+            try { contentsAct = supabaseService.getContentsForUser(userSession.getAuthenticatedUser().getId()); } catch (Exception e) { System.err.println("[Dashboard] activity fetch error: " + e.getMessage()); }
+        }
+
+        int added = 0;
+        if (contentsAct != null && !contentsAct.isEmpty()) {
+            for (com.application.model.Content c : contentsAct) {
+                if (added >= 6) break;
+                String action = c.getEstadoProcesamiento() != null && !"pendiente".equalsIgnoreCase(c.getEstadoProcesamiento()) ? "Artículo procesado" : "Nuevo contenido";
+                String detail = c.getTitulo() != null ? c.getTitulo() : c.getStoragePath();
+                String time = c.getCreatedAt() != null ? c.getCreatedAt().toString() : "hace poco";
+                VaadinIcon icon = VaadinIcon.FILE_TEXT;
+                String color = "#8b5cf6";
+                if (action.contains("Recomendación")) { icon = VaadinIcon.LIGHTBULB; color = "#10b981"; }
+                timeline.add(createTimelineItem(action, detail, time, icon, color));
+                added++;
+            }
+        } else {
+            timeline.add(createTimelineItem("Artículo procesado", "Spring Boot 3 - JWT y OAuth2", "hace 2 min", VaadinIcon.FILE_TEXT, "#8b5cf6"));
+            timeline.add(createTimelineItem("Recomendación generada", "Kubernetes: ConfigMaps en OCI", "hace 15 min", VaadinIcon.LIGHTBULB, "#10b981"));
+            timeline.add(createTimelineItem("Etiquetas actualizadas", "Docker, Kubernetes, Spring Dev", "hace 1 hora", VaadinIcon.TAGS, "#0284c7"));
+        }
 
         activityCard.add(actHeader, timeline);
 
@@ -245,18 +336,50 @@ public class DashboardView extends VerticalLayout {
         return row;
     }
 
+    // Backward-compatible overload: previous createTag(text, bg, fg, fontStyle)
     private Span createTag(String text, String bgColor, String textColor, String fontStyle) {
+        int fontSize = 13;
+        try {
+            String num = fontStyle.replaceAll("[^0-9]", "");
+            if (!num.isBlank()) fontSize = Integer.parseInt(num);
+        } catch (Exception ignored) {}
+        int padding = Math.max(10, fontSize - 2);
+        return createTag(text, bgColor, textColor, fontStyle, fontSize, padding);
+    }
+
+    // Enhanced tag helper with size and hover behavior
+    private Span createTag(String text, String bgColor, String textColor, String fontStyle, int fontSize, int padding) {
         Span tag = new Span(text);
+        String paddingCss = padding + "px " + (padding + 6) + "px";
         tag.getStyle()
                 .set("background-color", bgColor)
                 .set("color", textColor)
-                .set("padding", "6px 14px")
-                .set("border-radius", "20px")
-                .set("font-weight", fontStyle.contains("bold") ? "bold" : "500")
-                .set("font-size", fontStyle.replace("bold", "").trim());
+                .set("padding", paddingCss)
+                .set("border-radius", "28px")
+                .set("font-weight", fontStyle.contains("bold") ? "700" : "600")
+                .set("font-size", fontSize + "px")
+                .set("box-shadow", "0 6px 18px rgba(2,6,23,0.08)")
+                .set("cursor", "pointer")
+                .set("transition", "transform .12s ease, box-shadow .12s ease");
+        // simple hover effect using inline attributes
+        tag.getElement().setAttribute("onmouseover", "this.style.transform='scale(1.06)'; this.style.boxShadow='0 12px 30px rgba(2,6,23,0.12)'");
+        tag.getElement().setAttribute("onmouseout", "this.style.transform='scale(1)'; this.style.boxShadow='0 6px 18px rgba(2,6,23,0.08)'");
         return tag;
     }
 
+    // Color palette helper (cyclic)
+    private String pickColor(int idx) {
+        String[] palette = new String[]{"#FFEDD5","#FEF3C7","#E9D5FF","#DBEAFE","#ECFEFF","#FCE7F3","#E6FFFA","#FEE2E2","#FFF1F2","#F0FDF4"};
+        return palette[idx % palette.length];
+    }
+
+    private String pickTextColorForBg(String bg) {
+        // simple contrast choices
+        if (bg.equals("#FFEDD5") || bg.equals("#FEF3C7") || bg.equals("#ECFEFF") || bg.equals("#FFF1F2")) return "#78350f"; // dark amber
+        if (bg.equals("#E9D5FF") || bg.equals("#FCE7F3") || bg.equals("#FEE2E2")) return "#5b21b6"; // purple/magenta
+        if (bg.equals("#DBEAFE") || bg.equals("#E6FFFA") || bg.equals("#F0FDF4")) return "#0f172a"; // dark slate
+        return "#0f172a";
+    }
     private HorizontalLayout createTimelineItem(String action, String detail, String time, VaadinIcon icon, String color) {
         HorizontalLayout item = new HorizontalLayout();
         item.setAlignItems(Alignment.START);
@@ -303,23 +426,43 @@ public class DashboardView extends VerticalLayout {
         lpHeader.setJustifyContentMode(JustifyContentMode.BETWEEN);
         Span lpLabel = new Span("ÚLTIMO PROCESADO");
         lpLabel.getStyle().set("color", "#10b981").set("font-weight", "bold").set("font-size", "12px");
-        Span lpTime = new Span("hace 2 min");
+        Span lpTime = new Span("hace poco");
         lpTime.getStyle().set("color", "#94a3b8").set("font-size", "11px");
         lpHeader.add(lpLabel, lpTime);
 
-        H4 lpTitle = new H4("Spring Boot 3 - Configuración de Seguridad con OAuth2 y JWT");
+        // fetch latest content
+        com.application.model.Content latest = null;
+        if (userSession != null && userSession.getAuthenticatedUser() != null) {
+            try {
+                java.util.List<com.application.model.Content> cs = supabaseService.getContentsForUser(userSession.getAuthenticatedUser().getId());
+                if (cs != null && !cs.isEmpty()) latest = cs.get(0);
+            } catch (Exception e) { System.err.println("[Dashboard] latest fetch error: " + e.getMessage()); }
+        }
+
+        H4 lpTitle = new H4(latest != null && latest.getTitulo() != null ? latest.getTitulo() : "No hay contenido procesado");
         lpTitle.getStyle().set("margin", "10px 0");
         
-        Paragraph lpText = new Paragraph("Documentación oficial de Spring Security. Cubre filtros, token validación y flujo en entornos distribuidos.");
+        Paragraph lpText = new Paragraph(latest != null && latest.getTextoPlano() != null ? (latest.getTextoPlano().length() > 220 ? latest.getTextoPlano().substring(0, 220) + "..." : latest.getTextoPlano()) : "No hay descripción disponible.");
         lpText.getStyle().set("color", "#64748b").set("font-size", "13px").set("margin", "0 0 15px 0");
 
         FlexLayout lpTags = new FlexLayout();
         lpTags.getStyle().set("gap", "5px");
-        lpTags.add(createTag("Spring Boot", "#f3e8ff", "#8b5cf6", "11px"));
-        lpTags.add(createTag("Backend", "#fae8ff", "#c084fc", "11px"));
-        lpTags.add(createTag("JWT", "#fee2e2", "#dc2626", "11px"));
+        if (latest != null && latest.getTitulo() != null) {
+            String[] parts = latest.getTitulo().split("[^\\p{L}0-9]+");
+            int added = 0;
+            for (String p : parts) {
+                String t = p.trim();
+                if (t.length() < 3) continue;
+                lpTags.add(createTag(t, "#f3e8ff", "#8b5cf6", "11px"));
+                added++; if (added >= 5) break;
+            }
+        } else {
+            lpTags.add(createTag("Spring Boot", "#f3e8ff", "#8b5cf6", "11px"));
+            lpTags.add(createTag("Backend", "#fae8ff", "#c084fc", "11px"));
+            lpTags.add(createTag("JWT", "#fee2e2", "#dc2626", "11px"));
+        }
 
-        Anchor link = new Anchor("#", "spring.io/security");
+        Anchor link = new Anchor(latest != null && latest.getStoragePath() != null ? ("/storage/" + latest.getStoragePath()) : "#", "Ver recurso");
         link.getStyle().set("color", "#0284c7").set("font-size", "12px").set("margin-top", "10px");
 
         lastProcessed.add(lpHeader, lpTitle, lpText, lpTags, link);
