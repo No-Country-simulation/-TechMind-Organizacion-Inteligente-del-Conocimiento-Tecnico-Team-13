@@ -10,7 +10,6 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
@@ -22,8 +21,18 @@ public class ConceptGraphView extends VerticalLayout {
     private final VerticalLayout sidebar;
 
     public ConceptGraphView() {
+        setSizeFull();
+        setHeightFull();
+        setWidthFull();
         setPadding(false);
         setSpacing(false);
+        setMargin(false);
+        getStyle()
+                .set("height", "100%")
+                .set("max-height", "100%")
+                .set("overflow", "hidden")
+                .set("display", "flex")
+                .set("flex-direction", "column");
 
         // 1. Inicializar componentes principales
         graphComponent = new ConceptGraphComponent();
@@ -34,7 +43,7 @@ public class ConceptGraphView extends VerticalLayout {
         Component mainContent = createMainContent();
 
         add(header, mainContent);
-        expand(mainContent); // FIX: Make mainContent fill the remaining vertical space
+        expand(mainContent);
 
         // 3. Escuchar los eventos del Grafo y cargar datos
         graphComponent.addNodeSelectedListener(event -> showSidebarDetails(event.getNodeId()));
@@ -44,7 +53,7 @@ public class ConceptGraphView extends VerticalLayout {
 
     private Component createHeader() {
         H2 title = new H2("Concept Graph");
-        title.getStyle().set("margin", "0");
+        title.getStyle().set("margin", "0").set("font-size", "22px").set("font-weight", "700");
         Span subtitle = new Span("Mapa visual de relaciones entre conceptos técnicos");
         subtitle.getStyle()
                 .set("color", "var(--lumo-secondary-text-color)")
@@ -55,40 +64,37 @@ public class ConceptGraphView extends VerticalLayout {
         titleContainer.setSpacing(false);
         titleContainer.setAlignItems(Alignment.START);
 
-        TextField search = new TextField();
-        search.setPlaceholder("Buscar... (Ctrl+K)");
-        search.setPrefixComponent(new Icon(VaadinIcon.SEARCH));
-        search.setWidth("300px");
-
         Button exportButton = new Button("Exportar Grafo", new Icon(VaadinIcon.DOWNLOAD_ALT));
         exportButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SUCCESS);
+        exportButton.addClickListener(event -> graphComponent.exportGraph("concept-graph.png"));
 
-        Button notificationsButton = new Button(new Icon(VaadinIcon.BELL));
-        notificationsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-
-        Button settingsButton = new Button(new Icon(VaadinIcon.COG));
-        settingsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-
-        HorizontalLayout toolbar = new HorizontalLayout(search, exportButton, notificationsButton, settingsButton);
+        HorizontalLayout toolbar = new HorizontalLayout(exportButton);
         toolbar.setAlignItems(Alignment.CENTER);
         toolbar.setSpacing(true);
 
         HorizontalLayout header = new HorizontalLayout(titleContainer, toolbar);
         header.setWidthFull();
-        header.getStyle().set("padding", "16px 24px");
+        header.getStyle()
+                .set("padding", "14px 24px")
+                .set("background-color", "#FFFFFF")
+                .set("flex-shrink", "0")
+                .set("border-bottom", "1px solid #E2E8F0");
         header.setJustifyContentMode(JustifyContentMode.BETWEEN);
         header.setAlignItems(Alignment.CENTER);
-        header.getStyle().set("border-bottom", "1px solid var(--lumo-contrast-10pct)");
 
         return header;
     }
 
     private VerticalLayout createSidebar() {
         VerticalLayout layout = new VerticalLayout();
-        layout.setWidth("25%");
+        layout.setWidth("320px");
         layout.setHeightFull();
-        layout.getStyle().set("border-left", "1px solid var(--lumo-contrast-10pct)");
-        layout.setVisible(false); // Oculto hasta seleccionar un nodo
+        layout.getStyle()
+                .set("border-left", "1px solid #E2E8F0")
+                .set("background-color", "#FFFFFF")
+                .set("overflow-y", "auto")
+                .set("flex-shrink", "0");
+        layout.setVisible(false);
         layout.setPadding(false);
         layout.setSpacing(false);
         return layout;
@@ -96,21 +102,41 @@ public class ConceptGraphView extends VerticalLayout {
 
     private Component createMainContent() {
         Div graphContainer = new Div();
-        graphContainer.getStyle().set("position", "relative");
         graphContainer.setSizeFull();
-
-        graphComponent.setSizeFull();
+        graphContainer.getStyle()
+                .set("position", "relative")
+                .set("width", "100%")
+                .set("height", "100%")
+                .set("overflow", "hidden")
+                .set("flex", "1");
 
         Component legend = createLegendCard();
-        legend.getStyle().set("position", "absolute").set("top", "24px").set("left", "24px").set("zIndex", "1").set("width", "auto");
+        legend.getStyle()
+                .set("position", "absolute")
+                .set("top", "20px")
+                .set("left", "20px")
+                .set("zIndex", "10")
+                .set("width", "auto");
 
         Component graphControls = createGraphControls();
-        graphControls.getStyle().set("position", "absolute").set("top", "24px").set("right", "24px").set("zIndex", "1").set("width", "auto");
+        graphControls.getStyle()
+                .set("position", "absolute")
+                .set("top", "20px")
+                .set("right", "20px")
+                .set("zIndex", "10")
+                .set("width", "auto");
 
         graphContainer.add(graphComponent, legend, graphControls);
 
         HorizontalLayout mainLayout = new HorizontalLayout(graphContainer, sidebar);
         mainLayout.setSizeFull();
+        mainLayout.setSpacing(false);
+        mainLayout.setPadding(false);
+        mainLayout.setMargin(false);
+        mainLayout.getStyle()
+                .set("overflow", "hidden")
+                .set("height", "100%")
+                .set("flex", "1");
         mainLayout.expand(graphContainer);
 
         return mainLayout;
@@ -121,20 +147,21 @@ public class ConceptGraphView extends VerticalLayout {
         legendLayout.setSpacing(false);
         legendLayout.setPadding(false);
         legendLayout.getStyle()
-                .set("background-color", "var(--lumo-base-color)")
-                .set("border-radius", "var(--lumo-border-radius-l)")
-                .set("box-shadow", "var(--lumo-box-shadow-s)")
-                .set("padding", "16px");
+                .set("background-color", "rgba(255, 255, 255, 0.95)")
+                .set("border-radius", "12px")
+                .set("box-shadow", "0 4px 12px rgba(0, 0, 0, 0.08)")
+                .set("border", "1px solid #E2E8F0")
+                .set("backdrop-filter", "blur(8px)")
+                .set("padding", "14px");
 
         H4 title = new H4("Categorías");
-        title.getStyle().set("margin-top", "0").set("margin-bottom", "8px");
+        title.getStyle().set("margin-top", "0").set("margin-bottom", "8px").set("font-size", "13px").set("color", "#0F172A");
         legendLayout.add(title);
 
-        addLegendItem(legendLayout, "DevOps", "#4D96FF");
-        addLegendItem(legendLayout, "Backend", "#FF6B6B");
-        addLegendItem(legendLayout, "Cloud", "#6BFFB8");
-        addLegendItem(legendLayout, "Frontend", "#FFD166");
-        addLegendItem(legendLayout, "Data Science", "#A96BFF");
+        StaticConceptData.NODES.stream()
+                .map(StaticConceptData.NodeDto::group)
+                .distinct()
+                .forEach(category -> addLegendItem(legendLayout, category, getCategoryColor(category)));
 
         return legendLayout;
     }
@@ -143,14 +170,15 @@ public class ConceptGraphView extends VerticalLayout {
         Span colorDot = new Span();
         colorDot.getStyle()
                 .set("display", "inline-block")
-                .set("width", "12px")
-                .set("height", "12px")
+                .set("width", "10px")
+                .set("height", "10px")
                 .set("border-radius", "50%")
                 .set("background-color", color)
-                .set("margin-right", "8px");
+                .set("margin-right", "8px")
+                .set("flex-shrink", "0");
 
         Span text = new Span(name);
-        text.getStyle().set("vertical-align", "middle");
+        text.getStyle().set("font-size", "12px").set("color", "#334155");
 
         HorizontalLayout item = new HorizontalLayout(colorDot, text);
         item.setAlignItems(Alignment.CENTER);
@@ -160,20 +188,26 @@ public class ConceptGraphView extends VerticalLayout {
     }
 
     private Component createGraphControls() {
-        Button zoomIn = new Button(new Icon(VaadinIcon.PLUS));
-        zoomIn.addThemeVariants(ButtonVariant.LUMO_ICON);
-        Button zoomOut = new Button(new Icon(VaadinIcon.MINUS));
-        zoomOut.addThemeVariants(ButtonVariant.LUMO_ICON);
-        Button expand = new Button(new Icon(VaadinIcon.EXPAND_FULL));
-        expand.addThemeVariants(ButtonVariant.LUMO_ICON);
+        Button zoomIn = new Button(new Icon(VaadinIcon.PLUS), e -> graphComponent.zoomIn());
+        zoomIn.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_TERTIARY);
+        zoomIn.setTooltipText("Acercar");
+
+        Button zoomOut = new Button(new Icon(VaadinIcon.MINUS), e -> graphComponent.zoomOut());
+        zoomOut.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_TERTIARY);
+        zoomOut.setTooltipText("Alejar");
+
+        Button expand = new Button(new Icon(VaadinIcon.EXPAND_FULL), e -> graphComponent.fitGraph());
+        expand.addThemeVariants(ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_TERTIARY);
+        expand.setTooltipText("Centrar grafo");
 
         VerticalLayout controls = new VerticalLayout(zoomIn, zoomOut, expand);
         controls.setSpacing(false);
         controls.setPadding(false);
         controls.getStyle()
-                .set("background-color", "var(--lumo-base-color)")
-                .set("border-radius", "var(--lumo-border-radius-m)")
-                .set("box-shadow", "var(--lumo-box-shadow-s)")
+                .set("background-color", "rgba(255, 255, 255, 0.95)")
+                .set("border-radius", "10px")
+                .set("box-shadow", "0 4px 12px rgba(0, 0, 0, 0.08)")
+                .set("border", "1px solid #E2E8F0")
                 .set("padding", "4px");
 
         return controls;
@@ -194,43 +228,38 @@ public class ConceptGraphView extends VerticalLayout {
 
         sidebar.setVisible(true);
 
-        // --- Contenido principal del sidebar (scrollable) ---
         VerticalLayout contentWrapper = new VerticalLayout();
-        // FIX: setSizeFull() was causing a resize loop. Width is 100% by default.
         contentWrapper.setPadding(false);
         contentWrapper.setSpacing(false);
         contentWrapper.getStyle().set("overflow-y", "auto");
 
-        // --- Header del Sidebar ---
         Button closeButton = new Button(new Icon(VaadinIcon.CLOSE_SMALL), e -> sidebar.setVisible(false));
         closeButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
         Span categoryBadge = new Span("• " + concept.category());
-        categoryBadge.getElement().getThemeList().add("badge");
         categoryBadge.getStyle()
                 .set("color", getCategoryColor(concept.category()))
                 .set("background-color", getCategoryBackgroundColor(concept.category()))
                 .set("padding", "4px 8px")
                 .set("border-radius", "12px")
-                .set("font-size", "var(--lumo-font-size-xs)")
-                .set("font-weight", "500");
+                .set("font-size", "11px")
+                .set("font-weight", "600");
 
         HorizontalLayout header = new HorizontalLayout(categoryBadge, closeButton);
         header.setWidthFull();
         header.setJustifyContentMode(JustifyContentMode.BETWEEN);
         header.setAlignItems(Alignment.CENTER);
-        header.getStyle().set("padding", "12px 24px");
+        header.getStyle().set("padding", "12px 18px");
 
-        // --- Título y Resumen ---
         H3 title = new H3(concept.name());
-        title.getStyle().set("margin", "0");
+        title.getStyle().set("margin", "0").set("font-size", "17px").set("font-weight", "700");
         Paragraph description = new Paragraph(concept.description());
-        description.getStyle().set("color", "var(--lumo-secondary-text-color)");
+        description.getStyle().set("color", "#64748B").set("font-size", "13px").set("margin-top", "6px");
 
         VerticalLayout infoSection = new VerticalLayout(title, description);
         infoSection.setSpacing(false);
         infoSection.setPadding(false);
-        infoSection.getStyle().set("padding", "0 24px");
+        infoSection.getStyle().set("padding", "0 18px");
 
         Div separator1 = createSeparator();
         Div separator2 = createSeparator();
@@ -242,12 +271,12 @@ public class ConceptGraphView extends VerticalLayout {
                 separator2,
                 createContentItemsSection(concept));
 
-        // --- Acciones (Footer) ---
         Component actionButtons = createSidebarActionButtons();
         Div footer = new Div(actionButtons);
         footer.getStyle()
-                .set("padding", "16px 24px")
-                .set("background-color", "var(--lumo-contrast-5pct)");
+                .set("padding", "14px 18px")
+                .set("background-color", "#F8FAFC")
+                .set("border-top", "1px solid #E2E8F0");
 
         sidebar.add(header, contentWrapper, footer);
         sidebar.expand(contentWrapper);
@@ -257,14 +286,16 @@ public class ConceptGraphView extends VerticalLayout {
         VerticalLayout section = new VerticalLayout();
         section.setSpacing(true);
         section.setPadding(false);
-        section.getStyle().set("padding", "0 24px");
+        section.getStyle().set("padding", "0 18px");
 
         H4 title = new H4("Conceptos Relacionados");
-        title.getStyle().set("margin", "0 0 8px 0");
+        title.getStyle().set("margin", "0 0 8px 0").set("font-size", "13px");
         section.add(title);
 
         if (concept.relatedConcepts().isEmpty()) {
-            section.add(new Span("No hay conceptos relacionados."));
+            Span empty = new Span("No hay conceptos relacionados.");
+            empty.getStyle().set("font-size", "12px").set("color", "#94A3B8");
+            section.add(empty);
         } else {
             concept.relatedConcepts().forEach(related -> {
                 StaticConceptData.ConceptDetail relatedConcept = StaticConceptData.CONCEPTS.values().stream()
@@ -277,11 +308,14 @@ public class ConceptGraphView extends VerticalLayout {
                         .set("height", "8px")
                         .set("border-radius", "50%")
                         .set("background-color", relatedConcept != null ? getCategoryColor(relatedConcept.category()) : "#ccc")
-                        .set("margin-right", "12px");
+                        .set("margin-right", "8px");
 
                 Span name = new Span(related);
+                name.getStyle().set("font-size", "13px").set("color", "#334155");
+
                 Icon arrow = new Icon(VaadinIcon.ARROW_RIGHT);
-                arrow.getStyle().set("color", "var(--lumo-contrast-50pct)");
+                arrow.setSize("12px");
+                arrow.getStyle().set("color", "#94A3B8");
 
                 HorizontalLayout row = new HorizontalLayout(colorDot, name, arrow);
                 row.setAlignItems(Alignment.CENTER);
@@ -297,27 +331,31 @@ public class ConceptGraphView extends VerticalLayout {
         VerticalLayout section = new VerticalLayout();
         section.setSpacing(true);
         section.setPadding(false);
-        section.getStyle().set("padding", "0 24px");
+        section.getStyle().set("padding", "0 18px");
 
         H4 title = new H4("Contenidos con este Concepto");
-        title.getStyle().set("margin", "0 0 8px 0");
+        title.getStyle().set("margin", "0 0 8px 0").set("font-size", "13px");
         section.add(title);
 
         if (concept.contents().isEmpty()) {
-            section.add(new Span("No hay contenidos asociados."));
+            Span empty = new Span("No hay contenidos asociados.");
+            empty.getStyle().set("font-size", "12px").set("color", "#94A3B8");
+            section.add(empty);
         } else {
             concept.contents().forEach(contentName -> {
                 Span contentTitle = new Span(contentName);
-                contentTitle.getStyle().set("font-weight", "500");
-                Span meta = new Span("Article • 24 Jul 2024");
-                meta.getStyle().set("font-size", "var(--lumo-font-size-s)").set("color", "var(--lumo-secondary-text-color)");
+                contentTitle.getStyle().set("font-weight", "500").set("font-size", "13px").set("color", "#0F172A");
+                Span meta = new Span("Recurso técnico guardado");
+                meta.getStyle().set("font-size", "11px").set("color", "#64748B");
 
                 VerticalLayout card = new VerticalLayout(contentTitle, meta);
                 card.setSpacing(false);
+                card.setPadding(false);
                 card.getStyle()
-                        .set("border", "1px solid var(--lumo-contrast-10pct)")
-                        .set("border-radius", "var(--lumo-border-radius-m)")
-                        .set("padding", "12px");
+                        .set("border", "1px solid #E2E8F0")
+                        .set("border-radius", "8px")
+                        .set("padding", "10px")
+                        .set("background", "#F8FAFC");
                 section.add(card);
             });
         }
@@ -326,14 +364,11 @@ public class ConceptGraphView extends VerticalLayout {
 
     private Component createSidebarActionButtons() {
         Button consultAI = new Button("Consultar IA sobre este Concepto", new Icon(VaadinIcon.MAGIC));
-        consultAI.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SUCCESS);
+        consultAI.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        consultAI.getStyle().set("background-color", "#10B981").set("font-size", "12px");
         consultAI.setWidthFull();
 
-        Button viewInLibrary = new Button("Ver en Biblioteca", new Icon(VaadinIcon.BOOK));
-        viewInLibrary.addThemeVariants(ButtonVariant.LUMO_CONTRAST);
-        viewInLibrary.setWidthFull();
-
-        VerticalLayout layout = new VerticalLayout(consultAI, viewInLibrary);
+        VerticalLayout layout = new VerticalLayout(consultAI);
         layout.setSpacing(true);
         layout.setPadding(false);
         return layout;
@@ -344,30 +379,16 @@ public class ConceptGraphView extends VerticalLayout {
         separator.setHeight("1px");
         separator.setWidthFull();
         separator.getStyle()
-                .set("background-color", "var(--lumo-contrast-10pct)")
-                .set("margin", "16px 0");
+                .set("background-color", "#E2E8F0")
+                .set("margin", "12px 0");
         return separator;
     }
 
     private String getCategoryColor(String category) {
-        return switch (category) {
-            case "DevOps" -> "#4D96FF";
-            case "Backend" -> "#FF6B6B";
-            case "Cloud" -> "#6BFFB8";
-            case "Frontend" -> "#FFD166";
-            case "Data Science" -> "#A96BFF";
-            default -> "grey";
-        };
+        return StaticConceptData.getCategoryColor(category);
     }
 
     private String getCategoryBackgroundColor(String category) {
-        return switch (category) {
-            case "DevOps" -> "hsla(217, 100%, 65%, 0.1)";
-            case "Backend" -> "hsla(0, 100%, 71%, 0.1)";
-            case "Cloud" -> "hsla(150, 100%, 71%, 0.1)";
-            case "Frontend" -> "hsla(45, 100%, 70%, 0.1)";
-            case "Data Science" -> "hsla(271, 100%, 71%, 0.1)";
-            default -> "var(--lumo-contrast-10pct)";
-        };
+        return StaticConceptData.getCategoryBackgroundColor(category);
     }
 }

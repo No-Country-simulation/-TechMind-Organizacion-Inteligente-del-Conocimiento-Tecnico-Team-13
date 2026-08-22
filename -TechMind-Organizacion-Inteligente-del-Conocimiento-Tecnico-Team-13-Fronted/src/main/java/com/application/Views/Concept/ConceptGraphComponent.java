@@ -23,6 +23,13 @@ public class ConceptGraphComponent extends Component implements HasSize {
 
     public ConceptGraphComponent() {
         setSizeFull();
+        getStyle().set("display", "block");
+        getStyle().set("position", "absolute");
+        getStyle().set("top", "0");
+        getStyle().set("left", "0");
+        getStyle().set("width", "100%");
+        getStyle().set("height", "100%");
+        getStyle().set("overflow", "hidden");
     }
 
     /**
@@ -33,6 +40,22 @@ public class ConceptGraphComponent extends Component implements HasSize {
                 Json.instance().parse(convertToJson(nodes)),
                 Json.instance().parse(convertToJson(edges))
         );
+    }
+
+    public void zoomIn() {
+        getElement().callJsFunction("zoomIn");
+    }
+
+    public void zoomOut() {
+        getElement().callJsFunction("zoomOut");
+    }
+
+    public void fitGraph() {
+        getElement().callJsFunction("fitGraph");
+    }
+
+    public void exportGraph(String fileName) {
+        getElement().callJsFunction("exportGraph", fileName);
     }
 
     // Evento cuando se selecciona un nodo
@@ -69,7 +92,6 @@ public class ConceptGraphComponent extends Component implements HasSize {
     }
 
     private String convertToJson(Object object) {
-        // Usa ObjectMapper de Jackson o Gson para convertir tus registros a String JSON
         try {
             return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(object);
         } catch (Exception e) {

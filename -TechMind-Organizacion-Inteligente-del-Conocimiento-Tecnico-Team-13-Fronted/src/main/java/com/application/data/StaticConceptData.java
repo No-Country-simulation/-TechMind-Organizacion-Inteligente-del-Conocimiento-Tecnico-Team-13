@@ -7,7 +7,7 @@ import java.util.stream.Stream;
 
 public class StaticConceptData {
 
-    public record NodeDto(String id, String label, String group) {}
+    public record NodeDto(String id, String label, String group, String color) {}
     public record EdgeDto(String from, String to) {}
 
     public record ConceptDetail(
@@ -20,20 +20,40 @@ public class StaticConceptData {
             List<String> contents) {
     }
 
+    public static final Map<String, String> CATEGORY_COLORS = Map.ofEntries(
+            Map.entry("Backend", "#FF6B6B"),
+            Map.entry("Security", "#00B894"),
+            Map.entry("Arquitectura", "#F97316"),
+            Map.entry("Frontend", "#FFD166"),
+            Map.entry("DevOps", "#4D96FF"),
+            Map.entry("Cloud", "#6BFFB8"),
+            Map.entry("Data Science", "#A96BFF")
+    );
+
+    public static final Map<String, String> CATEGORY_BACKGROUND_COLORS = Map.ofEntries(
+            Map.entry("Backend", "hsla(0, 100%, 71%, 0.1)"),
+            Map.entry("Security", "hsla(162, 100%, 36%, 0.1)"),
+            Map.entry("Arquitectura", "hsla(24, 95%, 53%, 0.1)"),
+            Map.entry("Frontend", "hsla(45, 100%, 70%, 0.1)"),
+            Map.entry("DevOps", "hsla(217, 100%, 65%, 0.1)"),
+            Map.entry("Cloud", "hsla(150, 100%, 71%, 0.1)"),
+            Map.entry("Data Science", "hsla(271, 100%, 71%, 0.1)")
+    );
+
     public static final List<NodeDto> NODES = List.of(
-            new NodeDto("spring-boot", "Spring Boot", "Backend"),
-            new NodeDto("kafka", "Kafka", "Backend"),
-            new NodeDto("jwt", "JWT", "Security"),
-            new NodeDto("oauth2", "OAuth2", "Security"),
-            new NodeDto("microservices", "Microservices", "Arquitectura"),
-            new NodeDto("react", "React", "Frontend"),
-            new NodeDto("typescript", "TypeScript", "Frontend"),
-            new NodeDto("kubernetes", "Kubernetes", "DevOps"),
-            new NodeDto("terraform", "Terraform", "DevOps"),
-            new NodeDto("docker", "Docker", "DevOps"),
-            new NodeDto("oci", "OCI", "Cloud"),
-            new NodeDto("python", "Python", "Data Science"),
-            new NodeDto("pandas", "Pandas", "Data Science")
+            node("spring-boot", "Spring Boot", "Backend"),
+            node("kafka", "Kafka", "Backend"),
+            node("jwt", "JWT", "Security"),
+            node("oauth2", "OAuth2", "Security"),
+            node("microservices", "Microservices", "Arquitectura"),
+            node("react", "React", "Frontend"),
+            node("typescript", "TypeScript", "Frontend"),
+            node("kubernetes", "Kubernetes", "DevOps"),
+            node("terraform", "Terraform", "DevOps"),
+            node("docker", "Docker", "DevOps"),
+            node("oci", "OCI", "Cloud"),
+            node("python", "Python", "Data Science"),
+            node("pandas", "Pandas", "Data Science")
     );
 
     public static final List<EdgeDto> EDGES = List.of(
@@ -95,4 +115,16 @@ public class StaticConceptData {
                         );
                     }
             ));
+
+    public static String getCategoryColor(String category) {
+        return CATEGORY_COLORS.getOrDefault(category, "#94A3B8");
+    }
+
+    public static String getCategoryBackgroundColor(String category) {
+        return CATEGORY_BACKGROUND_COLORS.getOrDefault(category, "var(--lumo-contrast-10pct)");
+    }
+
+    private static NodeDto node(String id, String label, String group) {
+        return new NodeDto(id, label, group, getCategoryColor(group));
+    }
 }
