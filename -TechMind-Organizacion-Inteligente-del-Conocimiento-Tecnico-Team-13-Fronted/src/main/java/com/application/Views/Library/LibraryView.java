@@ -58,10 +58,13 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
     private Set<String> activeContentTypes = new HashSet<>();
     private String activeDateRange = "Siempre";
     private boolean verifiedOnly = false;
+    private int minAiRelevance = 0;
+    private String searchQuery = "";
     private FlexLayout activeFiltersBar;
     private int currentPage = 1;
     private int pageSize = 12;
     private HorizontalLayout paginationLayout;
+    private TextField searchField;
 
 
 
@@ -275,11 +278,17 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
         controls.setAlignItems(Alignment.CENTER);
         controls.setSpacing(true);
 
-        TextField searchField = new TextField();
+        searchField = new TextField();
         searchField.setPlaceholder("Search across technical rep");
         searchField.setPrefixComponent(VaadinIcon.SEARCH.create());
         searchField.setSuffixComponent(new Span("⌘K"));
         searchField.setWidth("300px");
+        searchField.setValueChangeMode(ValueChangeMode.EAGER);
+        searchField.addValueChangeListener(event -> {
+            searchQuery = event.getValue() != null ? event.getValue().trim() : "";
+            currentPage = 1;
+            applyFilters();
+        });
         searchField.getStyle().set("border-radius", "20px");
 
         Icon bellIcon = VaadinIcon.BELL_O.create();
@@ -371,12 +380,25 @@ filterBtn.getStyle()
 
     private void updateActiveFiltersBar() {
         activeFiltersBar.removeAll();
-        boolean hasFilters = !activeCategories.isEmpty() || !activeContentTypes.isEmpty() || !activeDateRange.equals("Siempre") || verifiedOnly;
+        boolean hasFilters = !searchQuery.isBlank() || !activeCategories.isEmpty() || !activeContentTypes.isEmpty()
+                || !activeDateRange.equals("Siempre") || verifiedOnly || minAiRelevance > 0;
 
         if (hasFilters) {
+            if (!searchQuery.isBlank()) {
+                activeFiltersBar.add(createFilterChip("Search: " + searchQuery, () -> {
+                    searchQuery = "";
+                    if (searchField != null && !searchField.isEmpty()) {
+                        searchField.clear();
+                    }
+                    currentPage = 1;
+                    applyFilters();
+                }));
+            }
+
             activeCategories.forEach(category -> {
                 activeFiltersBar.add(createFilterChip("Category: " + category, () -> {
                     activeCategories.remove(category);
+                    currentPage = 1;
                     applyFilters();
                 }));
             });
@@ -384,6 +406,7 @@ filterBtn.getStyle()
             activeContentTypes.forEach(type -> {
                 activeFiltersBar.add(createFilterChip("Type: " + type, () -> {
                     activeContentTypes.remove(type);
+                    currentPage = 1;
                     applyFilters();
                 }));
             });
@@ -391,6 +414,7 @@ filterBtn.getStyle()
             if (!activeDateRange.equals("Siempre")) {
                 activeFiltersBar.add(createFilterChip("Date: " + activeDateRange, () -> {
                     activeDateRange = "Siempre";
+                    currentPage = 1;
                     applyFilters();
                 }));
             }
@@ -398,6 +422,15 @@ filterBtn.getStyle()
             if (verifiedOnly) {
                 activeFiltersBar.add(createFilterChip("Verified Only", () -> {
                     verifiedOnly = false;
+                    currentPage = 1;
+                    applyFilters();
+                }));
+            }
+
+            if (minAiRelevance > 0) {
+                activeFiltersBar.add(createFilterChip("AI >= " + minAiRelevance + "%", () -> {
+                    minAiRelevance = 0;
+                    currentPage = 1;
                     applyFilters();
                 }));
             }
@@ -445,7 +478,7 @@ filterBtn.getStyle()
         List<Content> pageContents = filteredContents.subList(start, end);
 
         if (pageContents.isEmpty()) {
-            cardsGrid.add(new Span("No se encontraron contenidos con los filtros seleccionados."));
+            cardsGrid.add(createEmptyState());
         } else {
             pageContents.forEach(content -> {
                 String timeAgo = formatTimeAgo(content.getCreatedAt());
@@ -473,6 +506,35 @@ filterBtn.getStyle()
 
         updateActiveFiltersBar();
         updatePagination(totalPages, filteredContents.size());
+    }
+
+    private Component createEmptyState() {
+        VerticalLayout emptyState = new VerticalLayout();
+        emptyState.setWidthFull();
+        emptyState.setAlignItems(Alignment.CENTER);
+        emptyState.setJustifyContentMode(JustifyContentMode.CENTER);
+        emptyState.getStyle()
+                .set("min-height", "240px")
+                .set("color", "#64748b")
+                .set("grid-column", "1 / -1");
+
+        Icon icon = VaadinIcon.SEARCH.create();
+        icon.setSize("32px");
+        icon.setColor("#94a3b8");
+
+        Span message = new Span("No se encontró ningún resultado.");
+        message.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "600")
+                .set("color", "#334155");
+
+        Span hint = new Span(searchQuery.isBlank()
+                ? "Prueba ajustando los filtros seleccionados."
+                : "Revisa el texto de búsqueda o intenta con otro título.");
+        hint.getStyle().set("font-size", "13px");
+
+        emptyState.add(icon, message, hint);
+        return emptyState;
     }
 
     private void updatePagination(int totalPages, int totalItems) {
@@ -505,11 +567,90 @@ filterBtn.getStyle()
     }
 
     private boolean matchesFilters(Content content) {
-        boolean categoryMatch = activeCategories.isEmpty() || activeCategories.contains(content.getTipoContenido());
-        boolean contentTypeMatch = activeContentTypes.isEmpty() || activeContentTypes.contains(content.getTipoContenido());
+        boolean searchMatch = matchesSearch(content);
+        boolean categoryMatch = activeCategories.isEmpty() || activeCategories.stream()
+                .anyMatch(category -> matchesCategory(content, category));
+        boolean contentTypeMatch = activeContentTypes.isEmpty() || activeContentTypes.stream()
+                .anyMatch(type -> matchesContentType(content.getTipoContenido(), type));
         boolean dateMatch = isWithinDateRange(content);
-        // boolean verifiedMatch = !verifiedOnly || content.isVerified(); // Assuming a getIsVerified() method
-        return categoryMatch && contentTypeMatch && dateMatch;
+        boolean verifiedMatch = !verifiedOnly || isVerified(content);
+        boolean relevanceMatch = calculateAiRelevance(content) >= minAiRelevance;
+        return searchMatch && categoryMatch && contentTypeMatch && dateMatch && verifiedMatch && relevanceMatch;
+    }
+
+    private boolean matchesSearch(Content content) {
+        return searchQuery.isBlank() || containsNormalized(content.getTitulo(), searchQuery);
+    }
+
+    private boolean matchesCategory(Content content, String category) {
+        String haystack = normalized(contentSearchText(content));
+        String selectedCategory = normalized(category);
+        if (haystack.contains(selectedCategory)) {
+            return true;
+        }
+        return Arrays.stream(selectedCategory.split("\\s+"))
+                .filter(word -> word.length() > 2)
+                .anyMatch(haystack::contains);
+    }
+
+    private boolean matchesContentType(String contentType, String selectedType) {
+        String normalizedContentType = normalized(contentType);
+        String normalizedSelectedType = normalized(selectedType);
+        if (normalizedContentType.isBlank() || normalizedSelectedType.isBlank()) {
+            return false;
+        }
+        return normalizedContentType.equals(normalizedSelectedType)
+                || normalizedContentType.contains(normalizedSelectedType)
+                || normalizedSelectedType.contains(normalizedContentType);
+    }
+
+    private String contentSearchText(Content content) {
+        return String.join(" ",
+                safe(content.getTitulo()),
+                safe(content.getTipoContenido()),
+                safe(content.getTextoPlano()),
+                safe(content.getStoragePath()));
+    }
+
+    private boolean containsNormalized(String source, String query) {
+        return normalized(source).contains(normalized(query));
+    }
+
+    private String normalized(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase()
+                .replace("_", " ")
+                .replace("-", " ")
+                .trim();
+    }
+
+    private String safe(String value) {
+        return value != null ? value : "";
+    }
+
+    private boolean isVerified(Content content) {
+        String status = normalized(content.getEstadoProcesamiento());
+        return status.contains("complet")
+                || status.contains("procesad")
+                || status.contains("processed")
+                || status.contains("complete")
+                || status.contains("success");
+    }
+
+    private int calculateAiRelevance(Content content) {
+        int score = 25;
+        if (content.getTextoPlano() != null && !content.getTextoPlano().isBlank()) {
+            score += 45;
+        }
+        if (isVerified(content)) {
+            score += 20;
+        }
+        if (content.getTitulo() != null && !content.getTitulo().isBlank()) {
+            score += 10;
+        }
+        return Math.min(score, 100);
     }
 
     private boolean isWithinDateRange(Content content) {
@@ -548,6 +689,12 @@ filterBtn.getStyle()
         activeContentTypes.clear();
         activeDateRange = "Siempre";
         verifiedOnly = false;
+        minAiRelevance = 0;
+        searchQuery = "";
+        if (searchField != null && !searchField.isEmpty()) {
+            searchField.clear();
+        }
+        currentPage = 1;
         applyFilters();
     }
 
@@ -638,8 +785,12 @@ filterBtn.getStyle()
         });
         rightColumn.add(createFilterSection("Rango de Fechas", dateRange));
 
-        NativeRangeInput relevanceSlider = new NativeRangeInput(0, 100, 50);
+        NativeRangeInput relevanceSlider = new NativeRangeInput(0, 100, minAiRelevance);
         relevanceSlider.getStyle().set("width", "100%"); // Set width using Component's style
+        relevanceSlider.addValueChangeListener(source -> {
+            minAiRelevance = source.getValue();
+            updateResultsCount(resultsCount);
+        });
         rightColumn.add(createFilterSection("Relevancia IA", relevanceSlider));
 
         Checkbox verifiedCheckbox = new Checkbox("Mostrar solo verificados");
@@ -661,6 +812,7 @@ filterBtn.getStyle()
             categoryButtons.values().forEach(b -> b.removeThemeVariants(ButtonVariant.LUMO_PRIMARY));
             contentTypeButtons.values().forEach(b -> b.removeThemeVariants(ButtonVariant.LUMO_PRIMARY));
             dateRange.setValue("Siempre");
+            relevanceSlider.setValue(0);
             verifiedCheckbox.setValue(false);
             
             updateResultsCount(resultsCount);
@@ -668,6 +820,7 @@ filterBtn.getStyle()
         clearButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
         Button applyButton = new Button("Aplicar Filtros", e -> {
+            currentPage = 1;
             applyFilters();
             dialog.close();
         });

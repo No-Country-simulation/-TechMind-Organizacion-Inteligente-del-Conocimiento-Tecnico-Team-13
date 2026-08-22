@@ -11,67 +11,121 @@ import com.application.Views.Settings.SettingsView;
 import com.application.model.User;
 import com.application.service.UserSession;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.RouterLink;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class AppSidebar extends VerticalLayout {
+public class AppSidebar extends VerticalLayout implements BeforeEnterObserver {
+
+    private final List<NavItemContainer> navItems = new ArrayList<>();
+    private Runnable onToggleCollapseListener;
+
+    // Estructura interna para gestionar la referencia del item y su clase de vista
+    private record NavItemContainer(
+            RouterLink link, 
+            HorizontalLayout itemLayout, 
+            Icon icon, 
+            Span label, 
+            Class<? extends Component> viewClass
+    ) {}
 
     public AppSidebar(UserSession userSession) {
+        this(userSession, null);
+    }
+
+    public AppSidebar(UserSession userSession, Runnable onToggleCollapseListener) {
+        this.onToggleCollapseListener = onToggleCollapseListener;
+
         setWidth("260px");
-        setHeightFull();
+        setHeight("100vh");
         setPadding(true);
         setSpacing(true);
         setMargin(false);
-        // ensure sidebar stretches with layout and doesn't shrink
+
         getStyle()
                 .set("background-color", "#0b1329")
                 .set("color", "#94a3b8")
+                .set("height", "100vh")
+                .set("max-height", "100vh")
                 .set("overflow-y", "auto")
-                .set("flex-shrink", "0");
-        // ensure the component itself stretches to parent height
-        // Allow the sidebar to follow the page scroll when content exceeds viewport
-        getElement().getStyle().set("align-self", "flex-start").set("min-height", "0");
-        // Keep the sidebar visually sticky within viewport but allow page scroll to move it when necessary
-        getElement().getStyle().set("position", "sticky").set("top", "0");
+                .set("overflow-x", "hidden")
+                .set("flex-shrink", "0")
+                .set("box-sizing", "border-box")
+                .set("transition", "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)");
 
-        // Logo / Título de la app
+        getElement().getStyle()
+                .set("align-self", "flex-start")
+                .set("min-height", "100vh")
+                .set("position", "sticky")
+                .set("top", "0")
+                .set("z-index", "20");
+
+        // Cabecera: Logo de la app + Botón de Ocultar Menú
         HorizontalLayout logoLayout = new HorizontalLayout();
         logoLayout.setAlignItems(Alignment.CENTER);
-        Icon logoIcon = VaadinIcon.DATABASE.create();
-        logoIcon.setColor("#00b894"); // Verde brillante
-        H3 logoTitle = new H3("LogiCore");
-        logoTitle.getStyle().set("color", "#ffffff").set("margin", "0");
-        Span logoSubtitle = new Span("Technical Co-pilot");
-        logoSubtitle.getStyle().set("font-size", "11px").set("color", "#64748b");
+        logoLayout.setWidthFull();
+        logoLayout.setJustifyContentMode(JustifyContentMode.BETWEEN);
+        logoLayout.getStyle().set("padding", "6px 0 6px 0");
 
-        VerticalLayout titleWrapper = new VerticalLayout(logoTitle, logoSubtitle);
-        titleWrapper.setPadding(false);
-        titleWrapper.setSpacing(false);
-        logoLayout.add(logoIcon, titleWrapper);
+        HorizontalLayout logoBrand = new HorizontalLayout();
+        logoBrand.setAlignItems(Alignment.CENTER);
+        logoBrand.setSpacing(true);
+
+        Image logoImage = new Image("Logicore-Logo.jpg", "LogiCore Logo");
+        logoImage.setMaxHeight("38px");
+        logoImage.setMaxWidth("150px");
+        logoImage.getStyle().set("object-fit", "contain").set("border-radius", "6px");
+        logoBrand.add(logoImage);
+
+        // Botón para colapsar / esconder menú
+        Button collapseBtn = new Button(VaadinIcon.CHEVRON_LEFT.create());
+        collapseBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON);
+        collapseBtn.setTooltipText("Ocultar menú lateral");
+        collapseBtn.getStyle()
+                .set("color", "#94a3b8")
+                .set("cursor", "pointer")
+                .set("padding", "6px")
+                .set("border-radius", "8px")
+                .set("background-color", "rgba(255, 255, 255, 0.05)");
+
+        collapseBtn.addClickListener(e -> {
+            if (this.onToggleCollapseListener != null) {
+                this.onToggleCollapseListener.run();
+            }
+        });
+
+        logoLayout.add(logoBrand, collapseBtn);
         add(logoLayout);
 
         // Separador
         Div separator = new Div();
-        separator.getStyle().set("height", "1px").set("background-color", "#1e293b").set("margin", "10px 0");
+        separator.getStyle().set("height", "1px").set("background-color", "#1e293b").set("margin", "6px 0 10px 0");
         add(separator);
 
-        // Elementos de navegación
-        add(createNavItem("Dashboard", VaadinIcon.HOME, DashboardView.class, true));
-        add(createNavItem("Add Content", VaadinIcon.PLUS, AddContentView.class, false));
-        add(createNavItem("Library", VaadinIcon.BOOKMARK, LibraryView.class, false));
-        add(createNavItem("Categorías", VaadinIcon.TAGS, CategoriesView.class, false));
-        add(createNavItem("Concept Graph", VaadinIcon.CONNECT_O, ConceptGraphView.class, false));
+        // Elementos de navegación principales
+        add(createNavItem("Dashboard", VaadinIcon.HOME, DashboardView.class));
+        add(createNavItem("Add Content", VaadinIcon.PLUS, AddContentView.class));
+        add(createNavItem("Library", VaadinIcon.BOOKMARK, LibraryView.class));
+        add(createNavItem("Categorías", VaadinIcon.TAGS, CategoriesView.class));
+        add(createNavItem("Concept Graph", VaadinIcon.CONNECT_O, ConceptGraphView.class));
 
-        // Item con badge
-        RouterLink aiConsultantLink = createNavItem("AI Consultant", VaadinIcon.CHAT, AiConsultantView.class, false);
+        // AI Consultant con Badge
+        RouterLink aiConsultantLink = createNavItem("AI Consultant", VaadinIcon.CHAT, AiConsultantView.class);
         Span badge = new Span("AI");
         badge.getStyle()
                 .set("background-color", "#00b894")
@@ -79,32 +133,36 @@ public class AppSidebar extends VerticalLayout {
                 .set("font-size", "10px")
                 .set("padding", "2px 6px")
                 .set("border-radius", "10px");
-        // Agregar el badge al contenedor del item
+
         aiConsultantLink.getChildren()
                 .filter(c -> c instanceof HorizontalLayout)
                 .findFirst()
                 .ifPresent(c -> ((HorizontalLayout) c).add(badge));
         add(aiConsultantLink);
 
-        add(createNavItem("Annotations", VaadinIcon.NOTEBOOK, AnnotationsView.class, false));
+        add(createNavItem("Annotations", VaadinIcon.NOTEBOOK, AnnotationsView.class));
 
-        // Espaciador para empujar el perfil al fondo
+        // Espaciador flexible para empujar el perfil al fondo
         VerticalLayout spacer = new VerticalLayout();
+        spacer.getStyle().set("min-height", "15px");
         add(spacer);
         expand(spacer);
 
         // Configuración
-        add(createNavItem("Settings", VaadinIcon.COG, SettingsView.class, false));
+        add(createNavItem("Settings", VaadinIcon.COG, SettingsView.class));
 
         // Perfil de usuario al fondo
         HorizontalLayout profileLayout = new HorizontalLayout();
         profileLayout.setAlignItems(Alignment.CENTER);
+        profileLayout.setSpacing(true);
         profileLayout.getStyle()
                 .set("border-top", "1px solid #1e293b")
-                .set("padding-top", "15px")
-                .set("width", "100%");
+                .set("padding-top", "12px")
+                .set("margin-top", "6px")
+                .set("width", "100%")
+                .set("overflow", "hidden");
 
-        User user = userSession.getAuthenticatedUser();
+        User user = userSession != null ? userSession.getAuthenticatedUser() : null;
         String fullName = "Guest User";
         String email = "guest@example.com";
         String initials = "GU";
@@ -131,22 +189,43 @@ public class AppSidebar extends VerticalLayout {
                 .set("display", "flex")
                 .set("align-items", "center")
                 .set("justify-content", "center")
-                .set("font-weight", "bold");
+                .set("font-weight", "bold")
+                .set("flex-shrink", "0");
 
-        VerticalLayout profileTexts = new VerticalLayout(
-                new Span(fullName),
-                new Span(email));
+        VerticalLayout profileTexts = new VerticalLayout();
         profileTexts.setPadding(false);
         profileTexts.setSpacing(false);
-        profileTexts.getStyle().set("line-height", "1.2");
-        profileTexts.getChildren().findFirst().ifPresent(c -> c.getStyle().set("color", "#ffffff").set("font-weight", "bold"));
-        profileTexts.getChildren().skip(1).findFirst().ifPresent(c -> c.getStyle().set("font-size", "11px").set("color", "#64748b"));
+        profileTexts.getStyle().set("line-height", "1.2").set("overflow", "hidden").set("max-width", "150px");
 
+        Span nameSpan = new Span(fullName);
+        nameSpan.getStyle()
+                .set("color", "#ffffff")
+                .set("font-weight", "600")
+                .set("font-size", "13px")
+                .set("white-space", "nowrap")
+                .set("overflow", "hidden")
+                .set("text-overflow", "ellipsis")
+                .set("display", "block");
+
+        Span emailSpan = new Span(email);
+        emailSpan.getStyle()
+                .set("font-size", "11px")
+                .set("color", "#64748b")
+                .set("white-space", "nowrap")
+                .set("overflow", "hidden")
+                .set("text-overflow", "ellipsis")
+                .set("display", "block");
+
+        profileTexts.add(nameSpan, emailSpan);
         profileLayout.add(avatar, profileTexts);
         add(profileLayout);
     }
 
-    private RouterLink createNavItem(String text, VaadinIcon icon, Class<? extends Component> viewClass, boolean active) {
+    public void setOnToggleCollapseListener(Runnable listener) {
+        this.onToggleCollapseListener = listener;
+    }
+
+    private RouterLink createNavItem(String text, VaadinIcon icon, Class<? extends Component> viewClass) {
         RouterLink link = new RouterLink("", viewClass);
         link.getStyle()
                 .set("text-decoration", "none")
@@ -156,28 +235,42 @@ public class AppSidebar extends VerticalLayout {
         HorizontalLayout item = new HorizontalLayout();
         item.setWidthFull();
         item.setAlignItems(Alignment.CENTER);
-        item.setPadding(true);
+        item.setPadding(false);
         item.setSpacing(true);
         item.getStyle()
                 .set("cursor", "pointer")
                 .set("border-radius", "8px")
-                .set("padding", "10px 15px");
+                .set("padding", "9px 12px")
+                .set("transition", "background-color 0.2s ease");
 
         Icon vaadinIcon = icon.create();
+        vaadinIcon.setSize("18px");
         Span label = new Span(text);
-
-        if (active) {
-            item.getStyle().set("background-color", "#1e293b");
-            vaadinIcon.setColor("#00b894");
-            label.getStyle().set("color", "#ffffff").set("font-weight", "600");
-        } else {
-            vaadinIcon.setColor("#64748b");
-            label.getStyle().set("color", "#94a3b8");
-        }
+        label.getStyle().set("font-size", "14px").set("white-space", "nowrap");
 
         item.add(vaadinIcon, label);
         link.add(item);
 
+        navItems.add(new NavItemContainer(link, item, vaadinIcon, label, viewClass));
         return link;
+    }
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        Class<?> targetView = event.getNavigationTarget();
+
+        for (NavItemContainer navItem : navItems) {
+            boolean isActive = navItem.viewClass().equals(targetView);
+
+            if (isActive) {
+                navItem.itemLayout().getStyle().set("background-color", "#1e293b");
+                navItem.icon().setColor("#00b894");
+                navItem.label().getStyle().set("color", "#ffffff").set("font-weight", "600");
+            } else {
+                navItem.itemLayout().getStyle().remove("background-color");
+                navItem.icon().setColor("#64748b");
+                navItem.label().getStyle().set("color", "#94a3b8").set("font-weight", "normal");
+            }
+        }
     }
 }

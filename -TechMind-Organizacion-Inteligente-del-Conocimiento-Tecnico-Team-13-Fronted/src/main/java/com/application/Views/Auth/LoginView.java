@@ -64,7 +64,7 @@ public class LoginView extends VerticalLayout {
         leftPanel.setHeightFull();
         leftPanel.setPadding(true);
         leftPanel.getStyle()
-                .set("background-color", "#0066FF")
+                .set("background-color", "#0b1329")
                 .set("color", "white")
                 .set("padding", "32px");
 
@@ -76,17 +76,17 @@ public class LoginView extends VerticalLayout {
         logoLayout.add(logoIcon, brandName);
         logoLayout.setAlignItems(Alignment.CENTER);
 
-        Image illustration = new Image("images/loginImage.jpg", "Illustration");
+        Image illustration = new Image("Logicore-Logo.jpg", "Illustration");
         
         illustration.setWidth("100%");
         illustration.setMaxWidth("260px");
         illustration.getStyle().set("margin", "auto");
         add(illustration);;
 
-        H2 welcomeTitle = new H2("Welcome!");
+        H2 welcomeTitle = new H2("¡Bienvenido a Logicore!");
         welcomeTitle.getStyle().set("margin", "0").set("color", "white").set("font-weight", "600");
 
-        Paragraph description = new Paragraph("Get a real intranet on top of your Office 365 environment, with Logicore.");
+        Paragraph description = new Paragraph("Conectando con la red del conocimiento de Logicore. Listo para clasificar y potenciar tus ideas.");
         description.getStyle().set("color", "#d0e1ff").set("font-size", "0.85rem").set("margin-top", "8px");
 
         HorizontalLayout dotsLayout = new HorizontalLayout();
