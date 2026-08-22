@@ -162,18 +162,7 @@ public class SupabaseService {
             return "Q/A";
         }
 
-        return switch (tipoContenido.trim()) {
-            case "Backend" -> "Backend";
-            case "Frontend" -> "Frontend";
-            case "Cloud Computing" -> "Cloud Computing";
-            case "Databases" -> "Databases";
-            case "Data Analysis" -> "Data Analysis";
-            case "Cybersecurity" -> "Cybersecurity";
-            case "Artificial Intelligence" -> "Artificial Intelligence";
-            case "Software Architecture" -> "Software Architecture";
-            case "Q/A" -> "Q/A";
-            default -> "Q/A";
-        };
+        return tipoContenido.trim();
     }
 
     private String normalizeNullableText(String textoPlano) {
@@ -209,6 +198,108 @@ public class SupabaseService {
                     .block();
         } catch (Exception e) {
             throw new RuntimeException("Error al obtener contenidos de Supabase: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Actualiza la categoría (tipo_contenido) de un contenido específico
+     */
+    public void updateContentCategory(UUID contentId, String newCategory) {
+        if (contentId == null) {
+            throw new IllegalArgumentException("contentId no puede ser nulo");
+        }
+
+        String endpoint = supabaseUrl + "/rest/v1/contenidos?id=eq." + contentId;
+        Map<String, Object> payload = Map.of("tipo_contenido", normalizeCategory(newCategory));
+
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(payload);
+            webClient.patch()
+                    .uri(endpoint)
+                    .header("Authorization", "Bearer " + serviceRoleKey)
+                    .header("apikey", serviceRoleKey)
+                    .header("Prefer", "return=representation")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(jsonPayload)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al actualizar la categoría en Supabase: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Actualiza el título y categoría de un contenido específico
+     */
+    public void updateContent(UUID contentId, String newTitle, String newCategory) {
+        if (contentId == null) {
+            throw new IllegalArgumentException("contentId no puede ser nulo");
+        }
+
+        String endpoint = supabaseUrl + "/rest/v1/contenidos?id=eq." + contentId;
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        if (newTitle != null && !newTitle.isBlank()) {
+            payload.put("titulo", newTitle.trim());
+        }
+        if (newCategory != null && !newCategory.isBlank()) {
+            payload.put("tipo_contenido", normalizeCategory(newCategory));
+        }
+
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(payload);
+            webClient.patch()
+                    .uri(endpoint)
+                    .header("Authorization", "Bearer " + serviceRoleKey)
+                    .header("apikey", serviceRoleKey)
+                    .header("Prefer", "return=representation")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(jsonPayload)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al actualizar el contenido en Supabase: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Mueve una lista de contenidos a una nueva categoría
+     */
+    public void moveContentsToCategory(List<UUID> contentIds, String targetCategory) {
+        if (contentIds == null || contentIds.isEmpty() || targetCategory == null || targetCategory.isBlank()) {
+            return;
+        }
+
+        for (UUID id : contentIds) {
+            updateContentCategory(id, targetCategory);
+        }
+    }
+
+    /**
+     * Renombra una categoría existente para todos los contenidos de un usuario
+     */
+    public void renameCategoryForUser(UUID userId, String oldCategory, String newCategory) {
+        if (userId == null || oldCategory == null || newCategory == null) {
+            return;
+        }
+
+        String endpoint = supabaseUrl + "/rest/v1/contenidos?user_id=eq." + userId + "&tipo_contenido=eq." + oldCategory;
+        Map<String, Object> payload = Map.of("tipo_contenido", normalizeCategory(newCategory));
+
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(payload);
+            webClient.patch()
+                    .uri(endpoint)
+                    .header("Authorization", "Bearer " + serviceRoleKey)
+                    .header("apikey", serviceRoleKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(jsonPayload)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al renombrar la categoría en Supabase: " + e.getMessage(), e);
         }
     }
 
@@ -264,7 +355,6 @@ public class SupabaseService {
 
         String endpoint = supabaseUrl + "/storage/v1/object/documentos_usuarios/" + storagePath;
         try {
-            // Use exchangeToMono to inspect status and headers for better diagnostics
             byte[] bytes = webClient.get()
                     .uri(endpoint)
                     .header("Authorization", "Bearer " + serviceRoleKey)
@@ -307,7 +397,6 @@ public class SupabaseService {
             String title = (overrideTitle != null && !overrideTitle.isBlank()) ? overrideTitle.trim() : extractedTitle;
             String content = data.content();
 
-            // Registrar en la tabla contenidos (usará estado_procesamiento = pendiente)
             return registerContentRecord(userId, title, tipoContenido, content, storagePath);
         } catch (Exception e) {
             throw new RuntimeException("Error al extraer y registrar contenido: " + e.getMessage(), e);
