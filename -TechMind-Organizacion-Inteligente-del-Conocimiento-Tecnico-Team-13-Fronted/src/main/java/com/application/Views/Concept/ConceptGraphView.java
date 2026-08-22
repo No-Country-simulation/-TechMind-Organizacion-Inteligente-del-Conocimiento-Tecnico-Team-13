@@ -1,12 +1,19 @@
 package com.application.Views.Concept;
 
+import com.application.Views.AI.AiConsultantView;
 import com.application.Views.Layout.MainLayout;
+import com.application.Views.Library.LibraryView;
 import com.application.service.ConceptGraphService;
-import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.*;
-import com.vaadin.flow.component.orderedlayout.FlexLayout;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
@@ -14,242 +21,329 @@ import com.vaadin.flow.router.Route;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
- * Clusters de contenido por similitud de embeddings (mismos vectores que usa ContenidoService
- * para "relacionados" y RagChatService para el RAG). Layout calculado en el servidor y renderizado
- * como SVG estático: sin dependencias externas, sin JS de terceros, cero riesgo de red en la demo.
+ * Grafo de conceptos: nodos = Contenido guardado, aristas = similitud coseno de sus embeddings
+ * (mismos datos que "relacionados" en ContenidoService y el contexto de RagChatService). Reusa el
+ * componente vis-network que ya trae main; solo cambia de dónde saca los datos.
  */
-@PageTitle("Concept Graph - KnowBase")
+@PageTitle("Concept Graph")
 @Route(value = "concept-graph", layout = MainLayout.class)
 public class ConceptGraphView extends VerticalLayout implements BeforeEnterObserver {
 
-    private static final String[] PALETTE = {
-            "#0284c7", "#8a2be2", "#d97706", "#059669", "#dc2626",
-            "#7c3aed", "#0891b2", "#db2777", "#65a30d", "#334155"
-    };
-    private static final int MAX_ARISTAS_POR_NODO = 4;
+    private static final Map<String, String> CATEGORY_COLORS = Map.ofEntries(
+            Map.entry("Backend", "#8a2be2"),
+            Map.entry("Frontend", "#059669"),
+            Map.entry("Cloud Computing", "#0284c7"),
+            Map.entry("Databases", "#0891b2"),
+            Map.entry("Data Analysis", "#7c3aed"),
+            Map.entry("Cybersecurity", "#dc2626"),
+            Map.entry("Artificial Intelligence", "#db2777"),
+            Map.entry("Software Architecture", "#d97706"),
+            Map.entry("Q/A", "#64748b")
+    );
 
     private final ConceptGraphService conceptGraphService;
-    private VerticalLayout graphContainer;
-    private VerticalLayout infoPanel;
+    private final ConceptGraphComponent graphComponent;
+    private final VerticalLayout sidebar;
+
+    private Map<String, ConceptGraphService.Node> nodesById = new HashMap<>();
+    private Map<String, List<ConceptGraphService.Node>> vecinosPorNodo = new HashMap<>();
+    private ConceptGraphService.Node nodoSeleccionado;
 
     public ConceptGraphView(ConceptGraphService conceptGraphService) {
         this.conceptGraphService = conceptGraphService;
 
-        setSizeFull();
-        setMargin(false);
-        setSpacing(true);
         setPadding(false);
-        getStyle()
-                .set("overflow-y", "auto")
-                .set("display", "flex")
-                .set("flex-direction", "column")
-                .set("padding", "20px");
+        setSpacing(false);
 
-        HorizontalLayout header = createHeader();
-        header.setHeight("auto");
-        add(header);
+        graphComponent = new ConceptGraphComponent();
+        sidebar = createSidebar();
 
-        graphContainer = new VerticalLayout();
-        graphContainer.setWidthFull();
-        graphContainer.setHeight("600px");
-        graphContainer.getStyle()
-                .set("background-color", "#ffffff")
-                .set("border", "1px solid #e2e8f0")
-                .set("border-radius", "12px")
-                .set("padding", "20px")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("position", "relative");
-        graphContainer.getStyle().set("flex", "1");
-        add(graphContainer);
+        Component header = createHeader();
+        Component mainContent = createMainContent();
+
+        add(header, mainContent);
+        expand(mainContent);
+
+        graphComponent.addNodeSelectedListener(event -> showSidebarDetails(event.getNodeId()));
+        graphComponent.addNodeDeselectedListener(event -> sidebar.setVisible(false));
     }
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        ConceptGraphService.Graph graph = conceptGraphService.build(MAX_ARISTAS_POR_NODO);
-        renderGraph(graph);
+        loadGraphData();
     }
 
-    private HorizontalLayout createHeader() {
-        HorizontalLayout header = new HorizontalLayout();
+    private Component createHeader() {
+        H2 title = new H2("Concept Graph");
+        title.getStyle().set("margin", "0");
+        Span subtitle = new Span("Clusters de contenido por similitud de embeddings");
+        subtitle.getStyle()
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("font-size", "var(--lumo-font-size-s)");
+
+        VerticalLayout titleContainer = new VerticalLayout(title, subtitle);
+        titleContainer.setPadding(false);
+        titleContainer.setSpacing(false);
+        titleContainer.setAlignItems(Alignment.START);
+
+        TextField search = new TextField();
+        search.setPlaceholder("Buscar en la biblioteca... (Ctrl+K)");
+        search.setPrefixComponent(new Icon(VaadinIcon.SEARCH));
+        search.setWidth("300px");
+        search.addKeyDownListener(com.vaadin.flow.component.Key.ENTER,
+                e -> UI.getCurrent().navigate(LibraryView.class));
+
+        Button notificationsButton = new Button(new Icon(VaadinIcon.BELL));
+        notificationsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+        Button settingsButton = new Button(new Icon(VaadinIcon.COG));
+        settingsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+        HorizontalLayout toolbar = new HorizontalLayout(search, notificationsButton, settingsButton);
+        toolbar.setAlignItems(Alignment.CENTER);
+        toolbar.setSpacing(true);
+
+        HorizontalLayout header = new HorizontalLayout(titleContainer, toolbar);
         header.setWidthFull();
+        header.getStyle().set("padding", "16px 24px");
+        header.setJustifyContentMode(JustifyContentMode.BETWEEN);
         header.setAlignItems(Alignment.CENTER);
+        header.getStyle().set("border-bottom", "1px solid var(--lumo-contrast-10pct)");
 
-        VerticalLayout titles = new VerticalLayout();
-        titles.setPadding(false);
-        titles.setSpacing(false);
-        H2 mainTitle = new H2("Grafo de Conceptos");
-        mainTitle.getStyle().set("margin", "0").set("font-size", "24px").set("color", "#0f172a");
-        Span subtitle = new Span("Clusters de contenido por similitud de embeddings (pasa el mouse sobre un nodo)");
-        subtitle.getStyle().set("color", "#64748b").set("font-size", "14px");
-        titles.add(mainTitle, subtitle);
-
-        header.add(titles);
         return header;
     }
 
-    private void renderGraph(ConceptGraphService.Graph graph) {
-        graphContainer.removeAll();
-        if (infoPanel != null) {
-            remove(infoPanel);
+    private VerticalLayout createSidebar() {
+        VerticalLayout layout = new VerticalLayout();
+        layout.setWidth("25%");
+        layout.setHeightFull();
+        layout.getStyle().set("border-left", "1px solid var(--lumo-contrast-10pct)");
+        layout.setVisible(false);
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        return layout;
+    }
+
+    private Component createMainContent() {
+        Div graphContainer = new Div();
+        graphContainer.getStyle().set("position", "relative");
+        graphContainer.setSizeFull();
+
+        graphComponent.setSizeFull();
+
+        Component legend = createLegendCard();
+        legend.getStyle().set("position", "absolute").set("top", "24px").set("left", "24px").set("zIndex", "1").set("width", "auto");
+
+        graphContainer.add(graphComponent, legend);
+
+        HorizontalLayout mainLayout = new HorizontalLayout(graphContainer, sidebar);
+        mainLayout.setSizeFull();
+        mainLayout.expand(graphContainer);
+
+        return mainLayout;
+    }
+
+    private Component createLegendCard() {
+        VerticalLayout legendLayout = new VerticalLayout();
+        legendLayout.setSpacing(false);
+        legendLayout.setPadding(false);
+        legendLayout.getStyle()
+                .set("background-color", "var(--lumo-base-color)")
+                .set("border-radius", "var(--lumo-border-radius-l)")
+                .set("box-shadow", "var(--lumo-box-shadow-s)")
+                .set("padding", "16px");
+
+        H4 title = new H4("Categorías");
+        title.getStyle().set("margin-top", "0").set("margin-bottom", "8px");
+        legendLayout.add(title);
+
+        CATEGORY_COLORS.forEach((name, color) -> addLegendItem(legendLayout, name, color));
+
+        return legendLayout;
+    }
+
+    private void addLegendItem(VerticalLayout container, String name, String color) {
+        Span colorDot = new Span();
+        colorDot.getStyle()
+                .set("display", "inline-block")
+                .set("width", "12px")
+                .set("height", "12px")
+                .set("border-radius", "50%")
+                .set("background-color", color)
+                .set("margin-right", "8px");
+
+        Span text = new Span(name);
+        text.getStyle().set("vertical-align", "middle").set("font-size", "13px");
+
+        HorizontalLayout item = new HorizontalLayout(colorDot, text);
+        item.setAlignItems(Alignment.CENTER);
+        item.setSpacing(false);
+        item.getStyle().set("padding-bottom", "4px");
+        container.add(item);
+    }
+
+    private void loadGraphData() {
+        ConceptGraphService.Graph graph = conceptGraphService.build(4);
+
+        nodesById = new HashMap<>();
+        vecinosPorNodo = new HashMap<>();
+        for (ConceptGraphService.Node nodo : graph.nodos()) {
+            nodesById.put(nodo.id().toString(), nodo);
+            vecinosPorNodo.put(nodo.id().toString(), new ArrayList<>());
         }
 
-        if (graph.nodos().isEmpty()) {
-            Paragraph placeholder = new Paragraph("Todavía no hay contenido con embedding calculado. " +
-                    "Guarda algo desde \"Añadir Contenido\" para ver el grafo.");
-            placeholder.getStyle().set("text-align", "center").set("color", "#64748b").set("font-size", "14px");
-            graphContainer.add(placeholder);
+        List<ConceptGraphComponent.NodeDto> nodeDtos = graph.nodos().stream()
+                .map(n -> new ConceptGraphComponent.NodeDto(n.id().toString(), n.titulo(), n.categoria()))
+                .toList();
+
+        List<ConceptGraphComponent.EdgeDto> edgeDtos = new ArrayList<>();
+        for (ConceptGraphService.Edge arista : graph.aristas()) {
+            String origen = arista.origenId().toString();
+            String destino = arista.destinoId().toString();
+            edgeDtos.add(new ConceptGraphComponent.EdgeDto(origen, destino));
+
+            ConceptGraphService.Node nodoDestino = nodesById.get(destino);
+            ConceptGraphService.Node nodoOrigen = nodesById.get(origen);
+            if (nodoDestino != null) {
+                vecinosPorNodo.get(origen).add(nodoDestino);
+            }
+            if (nodoOrigen != null) {
+                vecinosPorNodo.get(destino).add(nodoOrigen);
+            }
+        }
+
+        graphComponent.setGraphData(nodeDtos, edgeDtos);
+    }
+
+    private void showSidebarDetails(String nodeId) {
+        sidebar.removeAll();
+
+        ConceptGraphService.Node nodo = nodesById.get(nodeId);
+        if (nodo == null) {
+            sidebar.setVisible(false);
             return;
         }
+        nodoSeleccionado = nodo;
+        sidebar.setVisible(true);
 
-        graphContainer.add(new Html(buildSvg(graph)));
+        VerticalLayout contentWrapper = new VerticalLayout();
+        contentWrapper.setPadding(false);
+        contentWrapper.setSpacing(false);
+        contentWrapper.getStyle().set("overflow-y", "auto");
 
-        infoPanel = createInfoPanel(graph);
-        add(infoPanel);
-    }
+        Button closeButton = new Button(new Icon(VaadinIcon.CLOSE_SMALL), e -> sidebar.setVisible(false));
+        closeButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-    private VerticalLayout createInfoPanel(ConceptGraphService.Graph graph) {
-        long clusters = graph.nodos().stream().map(ConceptGraphService.Node::categoria).distinct().count();
-
-        VerticalLayout panel = new VerticalLayout();
-        panel.getStyle()
-                .set("background-color", "#ffffff")
-                .set("border", "1px solid #e2e8f0")
+        Span categoryBadge = new Span("• " + nodo.categoria());
+        categoryBadge.getElement().getThemeList().add("badge");
+        categoryBadge.getStyle()
+                .set("color", getCategoryColor(nodo.categoria()))
+                .set("background-color", getCategoryColor(nodo.categoria()) + "1A")
+                .set("padding", "4px 8px")
                 .set("border-radius", "12px")
-                .set("padding", "20px")
-                .set("margin-top", "20px");
-
-        H4 title = new H4("Estadísticas del Grafo");
-        title.getStyle().set("margin-top", "0");
-
-        FlexLayout stats = new FlexLayout();
-        stats.setWidthFull();
-        stats.getStyle().set("gap", "20px").set("flex-wrap", "wrap");
-
-        stats.add(createStatCard("Conceptos Totales", String.valueOf(graph.nodos().size())));
-        stats.add(createStatCard("Relaciones", String.valueOf(graph.aristas().size())));
-        stats.add(createStatCard("Clusters", String.valueOf(clusters)));
-
-        panel.add(title, stats);
-        return panel;
-    }
-
-    private VerticalLayout createStatCard(String label, String value) {
-        VerticalLayout card = new VerticalLayout();
-        card.getStyle()
-                .set("background-color", "#f8fafc")
-                .set("border", "1px solid #e2e8f0")
-                .set("border-radius", "8px")
-                .set("padding", "15px")
-                .set("flex", "1")
-                .set("min-width", "150px");
-        card.setSpacing(false);
-
-        Span labelSpan = new Span(label);
-        labelSpan.getStyle()
-                .set("font-size", "12px")
-                .set("color", "#64748b")
+                .set("font-size", "var(--lumo-font-size-xs)")
                 .set("font-weight", "500");
 
-        H3 valueHeader = new H3(value);
-        valueHeader.getStyle()
-                .set("margin", "5px 0 0 0")
-                .set("color", "#00b894")
-                .set("font-size", "24px");
+        HorizontalLayout header = new HorizontalLayout(categoryBadge, closeButton);
+        header.setWidthFull();
+        header.setJustifyContentMode(JustifyContentMode.BETWEEN);
+        header.setAlignItems(Alignment.CENTER);
+        header.getStyle().set("padding", "12px 24px");
 
-        card.add(labelSpan, valueHeader);
-        return card;
+        H3 title = new H3(nodo.titulo());
+        title.getStyle().set("margin", "0");
+        Paragraph description = new Paragraph(nodo.resumen() != null && !nodo.resumen().isBlank()
+                ? nodo.resumen() : "Sin texto disponible.");
+        description.getStyle().set("color", "var(--lumo-secondary-text-color)");
+
+        VerticalLayout infoSection = new VerticalLayout(title, description);
+        infoSection.setSpacing(false);
+        infoSection.setPadding(false);
+        infoSection.getStyle().set("padding", "0 24px");
+
+        contentWrapper.add(infoSection, createSeparator(), createRelatedConceptsSection(nodo));
+
+        Component actionButtons = createSidebarActionButtons();
+        Div footer = new Div(actionButtons);
+        footer.getStyle()
+                .set("padding", "16px 24px")
+                .set("background-color", "var(--lumo-contrast-5pct)");
+
+        sidebar.add(header, contentWrapper, footer);
+        sidebar.expand(contentWrapper);
     }
 
-    private String buildSvg(ConceptGraphService.Graph graph) {
-        Map<String, List<ConceptGraphService.Node>> porCategoria = graph.nodos().stream()
-                .collect(Collectors.groupingBy(ConceptGraphService.Node::categoria, LinkedHashMap::new, Collectors.toList()));
+    private VerticalLayout createRelatedConceptsSection(ConceptGraphService.Node nodo) {
+        VerticalLayout section = new VerticalLayout();
+        section.setSpacing(true);
+        section.setPadding(false);
+        section.getStyle().set("padding", "0 24px");
 
-        double width = 900, height = 560;
-        double cx = width / 2, cy = height / 2;
-        double clusterRadius = Math.min(width, height) / 2.0 - 90;
+        H4 title = new H4("Contenido relacionado");
+        title.getStyle().set("margin", "0 0 8px 0");
+        section.add(title);
 
-        List<String> categorias = new ArrayList<>(porCategoria.keySet());
-        int numCategorias = categorias.size();
-        Map<Long, double[]> posiciones = new HashMap<>();
+        List<ConceptGraphService.Node> vecinos = vecinosPorNodo.getOrDefault(nodo.id().toString(), List.of());
+        if (vecinos.isEmpty()) {
+            section.add(new Span("No hay contenido lo bastante parecido todavía."));
+        } else {
+            vecinos.forEach(vecino -> {
+                Span colorDot = new Span();
+                colorDot.getStyle()
+                        .set("display", "inline-block")
+                        .set("width", "8px")
+                        .set("height", "8px")
+                        .set("border-radius", "50%")
+                        .set("background-color", getCategoryColor(vecino.categoria()))
+                        .set("margin-right", "12px");
 
-        for (int i = 0; i < numCategorias; i++) {
-            String categoria = categorias.get(i);
-            double angle = (2 * Math.PI * i) / numCategorias;
-            double anchorX = cx + clusterRadius * Math.cos(angle);
-            double anchorY = cy + clusterRadius * Math.sin(angle);
+                Span name = new Span(vecino.titulo());
+                Icon arrow = new Icon(VaadinIcon.ARROW_RIGHT);
+                arrow.getStyle().set("color", "var(--lumo-contrast-50pct)");
 
-            List<ConceptGraphService.Node> nodos = porCategoria.get(categoria);
-            double subRadius = Math.min(70, 18 + nodos.size() * 6);
-            for (int j = 0; j < nodos.size(); j++) {
-                double subAngle = nodos.size() == 1 ? 0 : (2 * Math.PI * j) / nodos.size();
-                double x = clamp(anchorX + subRadius * Math.cos(subAngle), 20, width - 20);
-                double y = clamp(anchorY + subRadius * Math.sin(subAngle), 20, height - 20);
-                posiciones.put(nodos.get(j).id(), new double[]{x, y});
-            }
+                HorizontalLayout row = new HorizontalLayout(colorDot, name, arrow);
+                row.setAlignItems(Alignment.CENTER);
+                row.expand(name);
+                row.getStyle().set("cursor", "pointer").set("padding", "4px 0");
+                row.addClickListener(e -> showSidebarDetails(vecino.id().toString()));
+                section.add(row);
+            });
         }
-
-        StringBuilder svg = new StringBuilder();
-        svg.append("<svg viewBox=\"0 0 ").append((int) width).append(" ").append((int) height)
-                .append("\" xmlns=\"http://www.w3.org/2000/svg\" style=\"width:100%;height:100%\">");
-
-        for (ConceptGraphService.Edge edge : graph.aristas()) {
-            double[] a = posiciones.get(edge.origenId());
-            double[] b = posiciones.get(edge.destinoId());
-            if (a == null || b == null) {
-                continue;
-            }
-            double opacity = Math.max(0.12, Math.min(0.8, edge.similitud()));
-            svg.append(String.format(Locale.US,
-                    "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#94a3b8\" stroke-width=\"1\" stroke-opacity=\"%.2f\" />",
-                    a[0], a[1], b[0], b[1], opacity));
-        }
-
-        for (ConceptGraphService.Node nodo : graph.nodos()) {
-            double[] pos = posiciones.get(nodo.id());
-            if (pos == null) {
-                continue;
-            }
-            svg.append(String.format(Locale.US,
-                    "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"8\" fill=\"%s\" stroke=\"#ffffff\" stroke-width=\"1.5\"><title>%s (%s)</title></circle>",
-                    pos[0], pos[1], colorFor(nodo.categoria()), escapeXml(nodo.titulo()), escapeXml(nodo.categoria())));
-        }
-
-        for (int i = 0; i < numCategorias; i++) {
-            String categoria = categorias.get(i);
-            double angle = (2 * Math.PI * i) / numCategorias;
-            double labelX = clamp(cx + (clusterRadius + 55) * Math.cos(angle), 40, width - 40);
-            double labelY = clamp(cy + (clusterRadius + 55) * Math.sin(angle), 15, height - 5);
-            svg.append(String.format(Locale.US,
-                    "<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" fill=\"%s\" font-weight=\"700\" text-anchor=\"middle\">%s</text>",
-                    labelX, labelY, colorFor(categoria), escapeXml(categoria)));
-        }
-
-        svg.append("</svg>");
-        return svg.toString();
+        return section;
     }
 
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
+    private Component createSidebarActionButtons() {
+        Button consultAI = new Button("Consultar IA sobre este contenido", new Icon(VaadinIcon.MAGIC));
+        consultAI.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SUCCESS);
+        consultAI.setWidthFull();
+        consultAI.addClickListener(e -> UI.getCurrent().navigate(AiConsultantView.class));
+
+        Button viewInLibrary = new Button("Ver en Biblioteca", new Icon(VaadinIcon.BOOK));
+        viewInLibrary.addThemeVariants(ButtonVariant.LUMO_CONTRAST);
+        viewInLibrary.setWidthFull();
+        viewInLibrary.addClickListener(e -> UI.getCurrent().navigate(LibraryView.class));
+
+        VerticalLayout layout = new VerticalLayout(consultAI, viewInLibrary);
+        layout.setSpacing(true);
+        layout.setPadding(false);
+        return layout;
     }
 
-    private String colorFor(String categoria) {
-        int idx = Math.floorMod(categoria.hashCode(), PALETTE.length);
-        return PALETTE[idx];
+    private Div createSeparator() {
+        Div separator = new Div();
+        separator.setHeight("1px");
+        separator.setWidthFull();
+        separator.getStyle()
+                .set("background-color", "var(--lumo-contrast-10pct)")
+                .set("margin", "16px 0");
+        return separator;
     }
 
-    private String escapeXml(String s) {
-        if (s == null) {
-            return "";
-        }
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    private String getCategoryColor(String category) {
+        return CATEGORY_COLORS.getOrDefault(category, "#64748b");
     }
 }

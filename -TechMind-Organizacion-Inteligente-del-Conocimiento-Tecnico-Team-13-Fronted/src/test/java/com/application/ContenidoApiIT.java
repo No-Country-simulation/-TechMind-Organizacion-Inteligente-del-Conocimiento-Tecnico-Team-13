@@ -85,7 +85,7 @@ class ContenidoApiIT {
     @Test
     void guardaContenidoYQuedaDisponibleParaBusquedaPorSimilitud() throws Exception {
         when(modeloClienteService.analizarContenido(anyString(), anyString()))
-                .thenReturn(Mono.just(new ModeloResponse("Backend", 0.9, List.of("java", "spring"))));
+                .thenReturn(Mono.just(new ModeloResponse("Backend", 0.9, List.of("java", "spring"), List.of())));
         when(embeddingService.embed(anyString())).thenReturn(embeddingDeEjemplo(0.1f));
 
         mockMvc.perform(post("/contenido")

@@ -1,5 +1,6 @@
 package com.application.model;
 
+import com.application.model.support.TextArrayType;
 import com.application.model.support.VectorType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -7,12 +8,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Type;
-import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,9 +49,13 @@ public class Contenido {
     @Column(length = 100)
     private String categoria;
 
-    @JdbcTypeCode(SqlTypes.ARRAY)
+    // UserType a medida (no @JdbcTypeCode(SqlTypes.ARRAY)): el ArrayJdbcType/ArrayJavaType
+    // genérico de Hibernate 6.2.x tiene un bug conocido y falla el INSERT con
+    // "Could not convert 'java.lang.String' to 'java.lang.Class' ... to unwrap". TextArrayType
+    // arma el java.sql.Array a mano por JDBC puro, igual que VectorType hace con "vector(n)".
+    @Type(TextArrayType.class)
     @Column(name = "palabras_clave", columnDefinition = "text[]")
-    private List<String> palabrasClave = new ArrayList<>();
+    private String[] palabrasClave = new String[0];
 
     @Type(VectorType.class)
     @Column(columnDefinition = "vector(1536)")
@@ -129,11 +133,11 @@ public class Contenido {
     }
 
     public List<String> getPalabrasClave() {
-        return palabrasClave;
+        return new ArrayList<>(Arrays.asList(palabrasClave));
     }
 
     public void setPalabrasClave(List<String> palabrasClave) {
-        this.palabrasClave = palabrasClave != null ? palabrasClave : new ArrayList<>();
+        this.palabrasClave = palabrasClave != null ? palabrasClave.toArray(new String[0]) : new String[0];
     }
 
     public float[] getEmbedding() {

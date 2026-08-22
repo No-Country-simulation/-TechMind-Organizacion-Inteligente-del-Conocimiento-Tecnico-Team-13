@@ -4,11 +4,12 @@ Supabase ya resuelve Auth + Postgres/pgvector + Storage, y no hay ningún fronte
 Vercel: este repo (Spring Boot + Vaadin) **es** el frontend y el backend a la vez. Lo único que
 necesita infraestructura propia en OCI son los **dos servicios** que corren código del equipo:
 
-1. **`app` (este repo)** — Spring Boot + Vaadin, puerto 8080. Incluye ahora la capa de RAG
-   (embeddings/chat de OpenAI, pgvector) además del login y el resto de vistas.
-2. **`fastapi-classifier`** — el microservicio Python de Squad 2 (clasificador TF-IDF + LinearSVC,
-   ver `Hackaton_LogiCore.ipynb`), puerto 8000. Vive en otro repo; aquí solo se documenta cómo
-   desplegarlo *junto* al backend Java.
+1. **`app` (este repo, `-TechMind-...-Fronted/`)** — Spring Boot + Vaadin, puerto 8080. Incluye la
+   capa de RAG (embeddings/chat de OpenAI, pgvector) además del login y el resto de vistas.
+2. **`classifier`** (`App-Modelo-de-datos/`, hermano de este repo) — el clasificador de contenido:
+   Flask + scikit-learn (TF-IDF + LinearSVC) + spaCy, puerto 5000, servido con gunicorn. Vive
+   dentro de este mismo repositorio (no es un servicio externo ni de otro equipo); ya tiene su
+   propio `Dockerfile`.
 
 ```
                          Internet
@@ -20,10 +21,11 @@ necesita infraestructura propia en OCI son los **dos servicios** que corren cód
                     └───────┬───────┘
                             │ :8080
                             ▼
-                    ┌───────────────┐        :8000 (solo red interna,
+                    ┌───────────────┐        :5000 (solo red interna,
                     │  app (Vaadin) │ ─────▶  nunca expuesto a Internet)
                     │  Spring Boot  │        ┌───────────────────┐
-                    └───────┬───────┘        │ fastapi-classifier│
+                    └───────┬───────┘        │    classifier     │
+                            │                │  (Flask + spaCy)  │
                             │                └───────────────────┘
                             │ HTTPS (salida)
               ┌─────────────┼─────────────────┐
@@ -33,9 +35,9 @@ necesita infraestructura propia en OCI son los **dos servicios** que corren cód
         Storage)                         chat RAG)
 ```
 
-`fastapi-classifier` solo lo llama `app` server-to-server (`ModeloClienteService`) — nunca el
-navegador — así que no necesita puerto público ni entrada en Nginx. Eso simplifica bastante la
-superficie de ataque.
+`classifier` solo lo llama `app` server-to-server (`ModeloClienteService`, vía la propiedad
+`classifier.base-url` / env var `CLASSIFIER_BASE_URL`) — nunca el navegador — así que no necesita
+puerto público ni entrada en Nginx. Eso simplifica bastante la superficie de ataque.
 
 ## 1. Instancia de cómputo
 
@@ -80,12 +82,13 @@ SUPABASE_URL=https://bnaqxitmvgmspufbkpvt.supabase.co
 SUPABASE_API_KEY=sb_publishable_...
 SUPABASE_SERVICE_KEY=sb_secret_...
 SUPABASE_JWKS_URL=https://bnaqxitmvgmspufbkpvt.supabase.co/auth/v1/.well-known/jwks.json
-DB_URL=jdbc:postgresql://aws-0-us-east-2.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0
+DB_URL=jdbc:postgresql://aws-0-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require
 DB_USERNAME=postgres.bnaqxitmvgmspufbkpvt
 DB_PASSWORD=...
 
-# FastAPI del clasificador (nombre del servicio en docker-compose, ver abajo)
-FASTAPI_BASE_URL=http://fastapi-classifier:8000
+# Clasificador (nombre del servicio "classifier" en docker-compose, ver abajo). Coincide con
+# classifier.base-url=${CLASSIFIER_BASE_URL:...} en application.properties.
+CLASSIFIER_BASE_URL=http://classifier:5000
 
 # OpenAI (RAG)
 OPENAI_API_KEY=sk-proj-...
@@ -99,7 +102,9 @@ PORT=8080
 
 ## 4. docker-compose para los dos servicios + Nginx
 
-Extender el `docker-compose.yml` existente (que hoy solo levanta `app`) así:
+`docker-compose.yml` (en `-TechMind-...-Fronted/`) ya trae los dos servicios (`app` y
+`classifier`, este último apuntando por `context: ../App-Modelo-de-datos` al Dockerfile del
+clasificador). Para producción con TLS falta agregar Nginx delante:
 
 ```yaml
 services:
@@ -108,16 +113,21 @@ services:
       context: .
       dockerfile: Dockerfile
     env_file: .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - CLASSIFIER_BASE_URL=http://classifier:5000
     expose:
       - "8080"
-    restart: unless-stopped
     depends_on:
-      - fastapi-classifier
+      - classifier
+    restart: unless-stopped
 
-  fastapi-classifier:
-    image: registro-de-squad2/fastapi-classifier:latest   # o build: context: ../ruta-al-repo-de-squad2
+  classifier:
+    build:
+      context: ../App-Modelo-de-datos
+      dockerfile: Dockerfile
     expose:
-      - "8000"
+      - "5000"
     restart: unless-stopped
 
   nginx:
@@ -134,9 +144,11 @@ services:
     restart: unless-stopped
 ```
 
-`app` y `fastapi-classifier` usan `expose` (solo red interna de Docker), no `ports` — así
-`FASTAPI_BASE_URL=http://fastapi-classifier:8000` resuelve por nombre de servicio y nunca queda
-alcanzable desde fuera de la VM.
+`app` y `classifier` usan `expose` (solo red interna de Docker), no `ports` — así
+`CLASSIFIER_BASE_URL=http://classifier:5000` resuelve por nombre de servicio y nunca queda
+alcanzable desde fuera de la VM. (El `docker-compose.yml` del repo usa `ports: 8080:8080` en vez
+de `expose` para poder probarlo directo sin Nginx; para producción con Nginx delante, cambiarlo a
+`expose` como arriba.)
 
 ## 5. Nginx (reverse proxy + WebSocket para Vaadin)
 
@@ -191,7 +203,7 @@ sudo docker compose logs -f app   # confirmar que Flyway corrió la migración d
 
 - [ ] `docker compose logs app` muestra la migración Flyway `V1__enable_pgvector_and_create_contenido.sql` aplicada sin error (si falla, correrla a mano desde Supabase SQL Editor — el archivo está pensado para copiar/pegar tal cual).
 - [ ] `curl -I https://tu-dominio.com` responde 200 y la app carga en el navegador (prueba visual del login).
-- [ ] Desde la VM, `docker compose exec app curl http://fastapi-classifier:8000/docs` (o el endpoint que exponga Squad 2) responde — confirma que Spring Boot sí llega al clasificador por red interna.
+- [ ] Desde la VM, `docker compose exec app curl -X POST http://classifier:5000/predict -H "Content-Type: application/json" -d '{"titulo":"test","texto":"prueba de humo del clasificador"}'` responde con JSON (categoria/probabilidad/palabras_clave) — confirma que Spring Boot sí llega al clasificador por red interna.
 - [ ] Guardar un contenido de prueba desde "Añadir Contenido" y verificar que aparece con categoría y palabras clave (clasificador) y sin errores de embedding (OpenAI) en los logs.
 - [ ] Preguntar algo en el Consultor IA y verificar que cita una fuente real de lo guardado.
 - [ ] `OPENAI_API_KEY` y `SUPABASE_SERVICE_KEY` no aparecen en ningún archivo commiteado (solo en el `.env` de la VM).

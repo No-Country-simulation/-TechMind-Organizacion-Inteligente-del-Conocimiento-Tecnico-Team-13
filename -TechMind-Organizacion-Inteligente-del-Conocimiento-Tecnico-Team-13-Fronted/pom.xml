@@ -74,6 +74,16 @@
             <version>0.1.6</version>
         </dependency>
 
+        <!-- Fuerza una version de commons-compress compatible con tika-parser-zip-commons 2.9.2.
+             Sin esto, Maven resuelve una version mas vieja (arrastrada transitivamente por Apache
+             POI) que no tiene TarArchiveInputStream.getNextEntry() -> NoSuchMethodError al subir
+             cualquier PDF/DOCX en AddContentView (DocumentExtractor -> Tika AutoDetectParser). -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.26.2</version>
+        </dependency>
+
         <dependency>
             <groupId>com.vaadin</groupId>
             <!-- Replace artifactId with vaadin-core to use only free components -->
@@ -110,6 +120,43 @@
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Extraccion de texto de documentos subidos (PDF/DOCX/TXT) para AddContentView. Antes
+             usaba tika-parsers-standard-package (~40 jars: audio/video, CAD, crypto+bouncycastle,
+             OCR, mail, web-archive, XML, fuentes...) sin necesitarlos: DocumentExtractor solo llama
+             a AutoDetectParser sobre .pdf/.docx/.txt (.md se procesa aparte, con flexmark, sin tocar
+             Tika). Esos ~150 jars extra eran gran parte de por que el escaneo de anotaciones de
+             Vaadin al arrancar ("Search for subclasses...") tardaba mas de 2 minutos: le toca
+             enumerar clases de TODO el classpath, no solo com.application. Con los 3 modulos
+             puntuales que realmente se usan, Tika sigue soportando los mismos 3 formatos. -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-pdf-module</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-microsoft-module</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parser-text-module</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <!-- flexmark-all traía ~40 extensiones (tablas, wiki-link, jira/pdf/youtrack-converter,
+             icu4j de ~11k clases...) sin usarse: DocumentExtractor y AiConsultantView solo llaman
+             a Parser/HtmlRenderer del core, sin ninguna extensión. -->
+        <dependency>
+            <groupId>com.vladsch.flexmark</groupId>
+            <artifactId>flexmark</artifactId>
+            <version>0.64.8</version>
+        </dependency>
     </dependencies>
     
     <build>
@@ -131,16 +178,31 @@
                 <groupId>com.vaadin</groupId>
                 <artifactId>vaadin-maven-plugin</artifactId>
                 <version>${vaadin.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>build-frontend</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>production</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.vaadin</groupId>
+                        <artifactId>vaadin-maven-plugin</artifactId>
+                        <version>${vaadin.version}</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>build-frontend</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
     
     <repositories>
         <repository>

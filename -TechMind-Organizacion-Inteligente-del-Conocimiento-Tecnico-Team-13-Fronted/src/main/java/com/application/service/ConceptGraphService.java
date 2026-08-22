@@ -3,6 +3,8 @@ package com.application.service;
 import com.application.model.Contenido;
 import com.application.repository.ContenidoRepository;
 import com.pgvector.PGvector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
 @Service
 public class ConceptGraphService {
 
+    private static final Logger log = LoggerFactory.getLogger(ConceptGraphService.class);
+
     private final ContenidoRepository contenidoRepository;
     private final double minSimilarity;
 
@@ -29,7 +33,7 @@ public class ConceptGraphService {
         this.minSimilarity = minSimilarity;
     }
 
-    public record Node(Long id, String titulo, String categoria) {
+    public record Node(Long id, String titulo, String categoria, String resumen) {
     }
 
     public record Edge(Long origenId, Long destinoId, double similitud) {
@@ -42,7 +46,9 @@ public class ConceptGraphService {
         List<Contenido> todos = contenidoRepository.findAll();
 
         List<Node> nodos = todos.stream()
-                .map(c -> new Node(c.getId(), c.getTitulo(), c.getCategoria() != null ? c.getCategoria() : "Sin categoría"))
+                .map(c -> new Node(c.getId(), c.getTitulo(),
+                        c.getCategoria() != null ? c.getCategoria() : "Sin categoría",
+                        resumen(c.getTexto())))
                 .collect(Collectors.toList());
 
         Set<String> aristasVistas = new HashSet<>();
@@ -62,6 +68,15 @@ public class ConceptGraphService {
                         }
                     });
         }
+        log.info("Grafo de conceptos construido: {} nodo(s), {} arista(s)", nodos.size(), aristas.size());
         return new Graph(nodos, aristas);
+    }
+
+    private String resumen(String texto) {
+        if (texto == null || texto.isBlank()) {
+            return "";
+        }
+        String normalizado = texto.replaceAll("\\s+", " ").trim();
+        return normalizado.length() > 220 ? normalizado.substring(0, 220) + "…" : normalizado;
     }
 }

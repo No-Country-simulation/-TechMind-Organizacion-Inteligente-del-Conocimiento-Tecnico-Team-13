@@ -58,6 +58,17 @@ public class ContenidoService {
     }
 
     public GuardadoResult procesarYGuardar(UUID userId, ContenidoRequestDTO request, String tipoContenido, String storagePath) {
+        return procesarYGuardar(userId, request, tipoContenido, storagePath, null);
+    }
+
+    /**
+     * @param categoriaUsuario si no es null/blank, se guarda como categoría en vez de la que
+     *                         sugiera el clasificador (el usuario confirma/corrige en el diálogo
+     *                         de AddContentView). Las palabras clave siempre vienen del clasificador.
+     */
+    public GuardadoResult procesarYGuardar(UUID userId, ContenidoRequestDTO request, String tipoContenido,
+                                            String storagePath, String categoriaUsuario) {
+        log.info("Procesando contenido: userId={}, titulo=\"{}\", tipo={}", userId, request.titulo(), tipoContenido);
         String categoria = null;
         List<String> palabrasClave = Collections.emptyList();
         try {
@@ -70,6 +81,10 @@ public class ContenidoService {
             log.warn("Clasificador (FastAPI) no disponible, se guarda sin categoría/palabras clave: {}", e.getMessage());
         }
 
+        if (categoriaUsuario != null && !categoriaUsuario.isBlank()) {
+            categoria = categoriaUsuario.trim();
+        }
+
         float[] embedding = null;
         try {
             embedding = embeddingService.embed(request.titulo() + "\n" + request.texto());
@@ -80,6 +95,9 @@ public class ContenidoService {
         List<DuplicateWarning> duplicados = embedding != null
                 ? buscarPosiblesDuplicados(embedding)
                 : Collections.emptyList();
+        if (!duplicados.isEmpty()) {
+            log.warn("Posibles duplicados detectados para \"{}\": {}", request.titulo(), duplicados);
+        }
 
         Contenido contenido = new Contenido();
         contenido.setUserId(userId);
@@ -93,6 +111,8 @@ public class ContenidoService {
         contenido.setEmbedding(embedding);
 
         Contenido guardado = contenidoRepository.save(contenido);
+        log.info("Contenido guardado: id={}, titulo=\"{}\", categoria={}, embedding={}",
+                guardado.getId(), guardado.getTitulo(), guardado.getCategoria(), embedding != null ? "ok" : "no disponible");
 
         List<String> relacionados = embedding != null
                 ? buscarRelacionados(embedding, guardado.getId())
@@ -113,6 +133,19 @@ public class ContenidoService {
 
     public List<Contenido> listarPorUsuario(UUID userId) {
         return contenidoRepository.findByUserIdOrderByFechaCreacionDesc(userId);
+    }
+
+    /** Borra el contenido (si pertenece al usuario) y devuelve la entidad borrada, para que el
+     *  llamador pueda limpiar también el archivo en Storage si tenía storagePath. */
+    public Contenido eliminar(Long id, UUID userId) {
+        Contenido contenido = contenidoRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Contenido no encontrado: " + id));
+        if (!contenido.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("No autorizado para eliminar este contenido");
+        }
+        contenidoRepository.delete(contenido);
+        log.info("Contenido eliminado: id={}, titulo=\"{}\", userId={}", id, contenido.getTitulo(), userId);
+        return contenido;
     }
 
     private List<DuplicateWarning> buscarPosiblesDuplicados(float[] embedding) {

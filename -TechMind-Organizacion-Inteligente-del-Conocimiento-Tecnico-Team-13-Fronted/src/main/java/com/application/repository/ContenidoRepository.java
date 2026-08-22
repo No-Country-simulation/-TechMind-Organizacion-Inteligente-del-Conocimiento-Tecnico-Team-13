@@ -35,4 +35,14 @@ public interface ContenidoRepository extends JpaRepository<Contenido, Long> {
         String getCategoria();
         Double getSimilarity();
     }
+
+    /** Solo título + categoría (sin texto/embedding), para armar el catálogo liviano que
+     *  RagChatService le da al modelo como "de qué temas sé" — no confundir con findTopSimilar,
+     *  que es la búsqueda semántica real para responder con contenido citado. */
+    List<TituloCategoria> findAllBy();
+
+    interface TituloCategoria {
+        String getTitulo();
+        String getCategoria();
+    }
 }

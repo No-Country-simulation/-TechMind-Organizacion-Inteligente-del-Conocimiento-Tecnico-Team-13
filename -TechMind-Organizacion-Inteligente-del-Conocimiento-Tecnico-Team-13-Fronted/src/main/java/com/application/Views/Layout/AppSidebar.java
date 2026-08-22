@@ -2,14 +2,19 @@ package com.application.Views.Layout;
 
 import com.application.Views.AI.AiConsultantView;
 import com.application.Views.Annotations.AnnotationsView;
+import com.application.Views.Categories.CategoriesView;
 import com.application.Views.Concept.ConceptGraphView;
 import com.application.Views.Content.AddContentView;
 import com.application.Views.Dashboard.DashboardView;
 import com.application.Views.Library.LibraryView;
 import com.application.Views.Settings.SettingsView;
 import com.application.model.User;
+import com.application.service.AuthService;
 import com.application.service.UserSession;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -23,19 +28,23 @@ import java.util.stream.Collectors;
 
 public class AppSidebar extends VerticalLayout {
 
-    public AppSidebar(UserSession userSession) {
+    public AppSidebar(UserSession userSession, AuthService authService) {
         setWidth("260px");
-        setHeight("100vh");
+        setHeightFull();
         setPadding(true);
         setSpacing(true);
         setMargin(false);
+        // ensure sidebar stretches with layout and doesn't shrink
         getStyle()
                 .set("background-color", "#0b1329")
                 .set("color", "#94a3b8")
                 .set("overflow-y", "auto")
-                .set("flex-shrink", "0")
-                .set("position", "sticky")
-                .set("top", "0");
+                .set("flex-shrink", "0");
+        // ensure the component itself stretches to parent height
+        // Allow the sidebar to follow the page scroll when content exceeds viewport
+        getElement().getStyle().set("align-self", "flex-start").set("min-height", "0");
+        // Keep the sidebar visually sticky within viewport but allow page scroll to move it when necessary
+        getElement().getStyle().set("position", "sticky").set("top", "0");
 
         // Logo / Título de la app
         HorizontalLayout logoLayout = new HorizontalLayout();
@@ -62,6 +71,7 @@ public class AppSidebar extends VerticalLayout {
         add(createNavItem("Dashboard", VaadinIcon.HOME, DashboardView.class, true));
         add(createNavItem("Add Content", VaadinIcon.PLUS, AddContentView.class, false));
         add(createNavItem("Library", VaadinIcon.BOOKMARK, LibraryView.class, false));
+        add(createNavItem("Categorías", VaadinIcon.TAGS, CategoriesView.class, false));
         add(createNavItem("Concept Graph", VaadinIcon.CONNECT_O, ConceptGraphView.class, false));
 
         // Item con badge
@@ -136,7 +146,19 @@ public class AppSidebar extends VerticalLayout {
         profileTexts.getChildren().findFirst().ifPresent(c -> c.getStyle().set("color", "#ffffff").set("font-weight", "bold"));
         profileTexts.getChildren().skip(1).findFirst().ifPresent(c -> c.getStyle().set("font-size", "11px").set("color", "#64748b"));
 
-        profileLayout.add(avatar, profileTexts);
+        Button logoutButton = new Button(VaadinIcon.SIGN_OUT.create());
+        logoutButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ICON);
+        logoutButton.setAriaLabel("Cerrar sesión");
+        logoutButton.getElement().setAttribute("title", "Cerrar sesión");
+        logoutButton.getStyle().set("color", "#94a3b8").set("margin-left", "auto");
+        logoutButton.addClickListener(e -> {
+            authService.logout();
+            UI.getCurrent().getPage().setLocation("/");
+        });
+
+        profileLayout.setWidthFull();
+        profileLayout.add(avatar, profileTexts, logoutButton);
+        profileLayout.expand(profileTexts);
         add(profileLayout);
     }
 

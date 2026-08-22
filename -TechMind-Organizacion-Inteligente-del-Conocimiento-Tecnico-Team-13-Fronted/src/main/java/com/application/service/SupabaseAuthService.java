@@ -7,6 +7,8 @@ import com.application.model.AuthResponse;
 import com.application.model.SupabaseUser;
 import com.application.model.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,8 @@ import java.util.UUID;
 
 @Service
 public class SupabaseAuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(SupabaseAuthService.class);
 
     private final RestTemplate restTemplate;
     private final UserSession userSession;
@@ -64,14 +68,18 @@ public class SupabaseAuthService {
                 user.setNombre(supabaseUser.getNombre());
                 // Store user in session
                 userSession.setAuthenticatedUser(user);
+                log.info("Login exitoso: userId={}, email={}", user.getId(), email);
                 return user;
             }
+            log.warn("Login fallido (respuesta inesperada de Supabase Auth): email={}, status={}", email, response.getStatusCode());
             return null;
         } catch (HttpClientErrorException e) {
             String errorBody = e.getResponseBodyAsString();
             if (errorBody != null && (errorBody.contains("email_not_confirmed") || errorBody.toLowerCase().contains("not confirmed"))) {
+                log.warn("Login rechazado: correo no confirmado, email={}", email);
                 throw new EmailNotConfirmedException("Debes confirmar tu correo antes de iniciar sesión.");
             }
+            log.warn("Login fallido (credenciales inválidas o error de Supabase Auth): email={}, status={}", email, e.getStatusCode());
             return null;
         }
     }
@@ -120,10 +128,11 @@ public class SupabaseAuthService {
             if (responseBody.get("access_token") != null) {
                 userSession.setAuthenticatedUser(user);
             }
+            log.info("Registro exitoso: userId={}, email={}, autoLogin={}", user.getId(), email, responseBody.get("access_token") != null);
             return user;
         } catch (HttpClientErrorException e) {
             String errorBody = e.getResponseBodyAsString();
-            System.err.println("Supabase signUp error [" + e.getStatusCode() + "]: " + errorBody);
+            log.warn("Supabase signUp error [{}]: {}", e.getStatusCode(), errorBody);
             if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS
                     || (errorBody != null && errorBody.toLowerCase().contains("rate limit"))) {
                 throw new SupabaseRateLimitException("Se alcanzó el límite de correos de confirmación. Espera unos minutos y vuelve a intentar.");
@@ -138,6 +147,7 @@ public class SupabaseAuthService {
     public void signOut() {
         // Here you would typically call Supabase's /auth/v1/logout endpoint
         // For simplicity, we just clear the local session
+        log.info("Logout: userId={}", userSession.getAuthenticatedUser() != null ? userSession.getAuthenticatedUser().getId() : null);
         userSession.clear();
     }
 }

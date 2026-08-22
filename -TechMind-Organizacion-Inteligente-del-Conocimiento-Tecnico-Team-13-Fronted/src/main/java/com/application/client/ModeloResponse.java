@@ -6,15 +6,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * Espejo del contrato JSON fijado con Data Science (ver notebook Hackaton_LogiCore.ipynb,
- * sección 0.6): {"categoria": ..., "probabilidad": ..., "palabras_clave": [...]}.
- * No mapeamos "recomendaciones": el backend calcula sus propios contenidos relacionados vía
- * embeddings de OpenAI + pgvector (ver ContenidoService), independientes del clasificador.
+ * Espejo del contrato JSON del clasificador (Flask, ver ModeloClienteService/classifier.base-url):
+ * {"categoria": ..., "probabilidad": ..., "palabras_clave": [...], "recomendaciones": [...]}.
+ * El backend calcula sus propios contenidos relacionados vía embeddings de OpenAI + pgvector
+ * (ver ContenidoService.buscarRelacionados) en vez de usar "recomendaciones" del clasificador,
+ * pero se mapea igual por si algún consumidor futuro la necesita.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ModeloResponse(
         String categoria,
         Double probabilidad,
-        @JsonProperty("palabras_clave") List<String> palabrasClave
+        @JsonProperty("palabras_clave") List<String> palabrasClave,
+        List<String> recomendaciones
 ) {
 }

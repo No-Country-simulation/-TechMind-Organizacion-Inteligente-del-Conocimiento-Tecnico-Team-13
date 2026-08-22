@@ -3,7 +3,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
+    env_file: .env
     environment:
       - SPRING_PROFILES_ACTIVE=prod
+      - CLASSIFIER_BASE_URL=http://classifier:5000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - classifier
+    restart: unless-stopped
+
+  # Clasificador de contenido (App-Modelo-de-datos/, Flask + scikit-learn + spaCy, puerto 5000).
+  # Sin "ports": solo alcanzable desde "app" por la red interna de Docker (nombre de servicio
+  # "classifier"), nunca expuesto a Internet.
+  classifier:
+    build:
+      context: ../App-Modelo-de-datos
+      dockerfile: Dockerfile
+    expose:
+      - "5000"
+    restart: unless-stopped

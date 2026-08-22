@@ -51,7 +51,7 @@ class ContenidoServiceTest {
         ContenidoRequestDTO request = new ContenidoRequestDTO("Titulo", "Texto de prueba");
 
         when(modeloClienteService.analizarContenido("Titulo", "Texto de prueba"))
-                .thenReturn(Mono.just(new ModeloResponse("Backend", 0.9, List.of("java", "spring"))));
+                .thenReturn(Mono.just(new ModeloResponse("Backend", 0.9, List.of("java", "spring"), List.of())));
 
         float[] embedding = new float[]{0.1f, 0.2f};
         when(embeddingService.embed(anyString())).thenReturn(embedding);
@@ -109,7 +109,7 @@ class ContenidoServiceTest {
         ContenidoRequestDTO request = new ContenidoRequestDTO("Titulo", "Texto");
 
         when(modeloClienteService.analizarContenido(anyString(), anyString()))
-                .thenReturn(Mono.just(new ModeloResponse("Backend", 0.8, List.of())));
+                .thenReturn(Mono.just(new ModeloResponse("Backend", 0.8, List.of(), List.of())));
         when(embeddingService.embed(anyString())).thenThrow(new ModeloServiceException("OpenAI caído"));
 
         Contenido guardado = new Contenido();
@@ -132,7 +132,7 @@ class ContenidoServiceTest {
         ContenidoRequestDTO request = new ContenidoRequestDTO("Titulo", "Texto");
 
         when(modeloClienteService.analizarContenido(anyString(), anyString()))
-                .thenReturn(Mono.just(new ModeloResponse("Backend", 0.8, List.of())));
+                .thenReturn(Mono.just(new ModeloResponse("Backend", 0.8, List.of(), List.of())));
         when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
 
         ContenidoRepository.SimilarityMatch match = mock(ContenidoRepository.SimilarityMatch.class);

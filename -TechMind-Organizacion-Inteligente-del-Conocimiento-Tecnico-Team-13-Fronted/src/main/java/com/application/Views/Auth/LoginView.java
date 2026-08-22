@@ -5,6 +5,7 @@ import com.application.exception.EmailNotConfirmedException;
 import com.application.exception.SupabaseAuthException;
 import com.application.exception.SupabaseRateLimitException;
 import com.application.service.AuthService;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -167,7 +168,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         passwordField.setWidthFull();
         applyUnderlineStyle(passwordField);
 
-        Button signInBtn = new Button("Sign in", event -> {
+        Runnable performLogin = () -> {
             String username = usernameField.getValue().trim();
             String password = passwordField.getValue();
             if (username.isEmpty() || password.isEmpty()) {
@@ -184,7 +185,9 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
                 Notification.show("Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.", 5000, Notification.Position.TOP_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
-        });
+        };
+
+        Button signInBtn = new Button("Sign in", event -> performLogin.run());
         signInBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         signInBtn.getStyle().set("background-color", "#0066FF").set("border-radius", "6px").set("padding", "0 24px");
 
@@ -201,6 +204,14 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         forgotPassword.getStyle().set("font-size", "0.8rem").set("color", "#0066FF").set("margin-top", "24px").set("align-self", "center");
 
         loginForm.add(loginTitle, registerLayout, subtitle, usernameField, passwordField, actionLayout, forgotPassword);
+
+        // Atajo: Enter en usuario o contraseña dispara "Sign in". Se hace con JS puro (en vez de
+        // Shortcuts/addClickShortcut de Vaadin) porque el PasswordField envuelve su <input> en un
+        // <form> interno para el autocompletado del navegador, y ese <form> puede interceptar el
+        // Enter antes de que llegue al listener de Flow. Escuchando directo en cada campo y
+        // llamando preventDefault() se evita ese conflicto de forma determinística.
+        bindEnterToClick(usernameField, signInBtn);
+        bindEnterToClick(passwordField, signInBtn);
 
         // Register Form
         registerForm = new VerticalLayout();
@@ -225,7 +236,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         registerPasswordField.setHelperText("Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 dígito, 1 carácter especial.");
         applyUnderlineStyle(registerPasswordField);
 
-        Button registerButton = new Button("Register", event -> {
+        Runnable performRegister = () -> {
             String nombre = registerNombreField.getValue().trim();
             String username = registerUsernameField.getValue().trim();
             String password = registerPasswordField.getValue();
@@ -244,7 +255,9 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
                 Notification.show(e.getMessage(), 5000, Notification.Position.TOP_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
-        });
+        };
+
+        Button registerButton = new Button("Register", event -> performRegister.run());
         registerButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         registerButton.getStyle().set("background-color", "#0066FF").set("border-radius", "6px").set("padding", "0 24px");
 
@@ -253,6 +266,11 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         backToLogin.getStyle().set("font-size", "0.8rem").set("color", "#0066FF");
 
         registerForm.add(registerTitle, registerNombreField, registerUsernameField, registerPasswordField, registerButton, backToLogin);
+
+        // Atajo: Enter en cualquier campo del registro dispara "Register".
+        bindEnterToClick(registerNombreField, registerButton);
+        bindEnterToClick(registerUsernameField, registerButton);
+        bindEnterToClick(registerPasswordField, registerButton);
 
         rightPanel.add(loginForm, registerForm);
         return rightPanel;
@@ -286,6 +304,24 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
             return false;
         }
         return true;
+    }
+
+    /** Enter en `field` hace clic en `button`. Se escucha en fase de CAPTURA (tercer argumento
+     *  `true` de addEventListener): el Shadow DOM interno de vaadin-text-field/password-field
+     *  maneja Enter por su cuenta (para el <form> interno del autocompletado) y puede detener la
+     *  propagación antes de que un listener normal (fase de burbuja) la reciba; en captura, en
+     *  cambio, nuestro listener en el elemento host se dispara ANTES de que baje al Shadow DOM, así
+     *  que nada dentro del componente puede bloquearlo primero. */
+    private void bindEnterToClick(Component field, Button button) {
+        field.getElement().executeJs(
+                "this.addEventListener('keydown', function(e) {" +
+                        "  if (e.key === 'Enter') {" +
+                        "    e.preventDefault();" +
+                        "    e.stopPropagation();" +
+                        "    if (!$0.disabled) { $0.click(); }" +
+                        "  }" +
+                        "}, true);",
+                button.getElement());
     }
 
     private void applyUnderlineStyle(com.vaadin.flow.component.HasStyle component) {
