@@ -76,11 +76,29 @@ public class AddContentView extends VerticalLayout {
     private String uploadedStoragePath = null;
     private String uploadedOriginalFileName = null;
 
+    private static final java.util.Map<String, String> CATEGORY_COLORS = java.util.Map.ofEntries(
+            java.util.Map.entry("Backend", "#8B5CF6"),
+            java.util.Map.entry("Frontend", "#10B981"),
+            java.util.Map.entry("Cloud Computing", "#F59E0B"),
+            java.util.Map.entry("Databases", "#0891B2"),
+            java.util.Map.entry("Data Analysis", "#EC4899"),
+            java.util.Map.entry("Cybersecurity", "#EF4444"),
+            java.util.Map.entry("Artificial Intelligence", "#8B5CF6"),
+            java.util.Map.entry("Software Architecture", "#6366F1"),
+            java.util.Map.entry("Q/A", "#64748B")
+    );
+
     // Panel de vista previa de análisis IA (poblado con el resultado real tras guardar)
     private VerticalLayout analysisPanel;
     private Span analysisPlaceholder;
-    private Span categoriaPill;
+    private Span statusBadge;
+    private Span categoriaDot;
+    private Span categoriaNombre;
+    private Span confianzaBadge;
+    private VerticalLayout categoriaSection;
+    private VerticalLayout palabrasSection;
     private FlexLayout palabrasClaveLayout;
+    private VerticalLayout relacionadosSection;
     private VerticalLayout relacionadosLayout;
 
     public AddContentView(ContenidoService contenidoService, SupabaseService supabaseService,
@@ -540,37 +558,121 @@ public class AddContentView extends VerticalLayout {
                 .set("flex", "1 1 360px")
                 .set("min-width", "260px");
         panel.setWidthFull();
+        panel.setSpacing(false);
 
-        Span title = new Span("Vista previa de análisis IA");
+        HorizontalLayout headerRow = new HorizontalLayout();
+        headerRow.setWidthFull();
+        headerRow.setJustifyContentMode(JustifyContentMode.BETWEEN);
+        headerRow.setAlignItems(Alignment.CENTER);
+
+        HorizontalLayout titleGroup = new HorizontalLayout();
+        titleGroup.setAlignItems(Alignment.CENTER);
+        titleGroup.setSpacing(true);
+        Icon magicIcon = VaadinIcon.MAGIC.create();
+        magicIcon.setSize("16px");
+        magicIcon.setColor("#00b894");
+        Span title = new Span("Resultado del Análisis");
         title.getStyle().set("font-weight", "700").set("font-size", "15px").set("color", "#0f172a");
+        titleGroup.add(magicIcon, title);
+
+        statusBadge = new Span("PENDIENTE");
+        statusBadge.getStyle()
+                .set("background-color", "#f1f5f9")
+                .set("color", "#64748b")
+                .set("font-size", "10px")
+                .set("font-weight", "700")
+                .set("letter-spacing", "0.04em")
+                .set("padding", "3px 10px")
+                .set("border-radius", "10px");
+
+        headerRow.add(titleGroup, statusBadge);
 
         analysisPlaceholder = new Span("Procesa un contenido para ver aquí la categoría, palabras clave y contenido relacionado (embeddings + clasificador).");
-        analysisPlaceholder.getStyle().set("color", "#94a3b8").set("font-size", "13px").set("margin-top", "10px");
+        analysisPlaceholder.getStyle()
+                .set("color", "#94a3b8")
+                .set("font-size", "13px")
+                .set("margin-top", "10px")
+                .set("display", "block");
 
-        categoriaPill = new Span();
-        categoriaPill.getStyle()
-                .set("background-color", "#00b8941A")
-                .set("color", "#00b894")
-                .set("font-size", "12px")
+        // Categoría asignada + % de confianza del clasificador
+        Span categoriaLabel = new Span("CATEGORÍA ASIGNADA");
+        categoriaLabel.getStyle()
+                .set("font-size", "10px").set("font-weight", "700").set("color", "#94a3b8")
+                .set("letter-spacing", "0.05em").set("display", "block");
+
+        HorizontalLayout categoriaRow = new HorizontalLayout();
+        categoriaRow.setAlignItems(Alignment.CENTER);
+        categoriaRow.setSpacing(true);
+        categoriaRow.getStyle().set("margin-top", "6px");
+
+        categoriaDot = new Span();
+        categoriaDot.getStyle().set("width", "10px").set("height", "10px").set("border-radius", "50%").set("flex-shrink", "0");
+
+        categoriaNombre = new Span();
+        categoriaNombre.getStyle().set("font-size", "16px").set("font-weight", "700").set("color", "#0f172a");
+
+        confianzaBadge = new Span();
+        confianzaBadge.getStyle()
+                .set("background-color", "#ecfdf5")
+                .set("color", "#059669")
+                .set("font-size", "11px")
                 .set("font-weight", "700")
-                .set("padding", "4px 12px")
-                .set("border-radius", "12px")
-                .set("display", "none");
+                .set("padding", "2px 8px")
+                .set("border-radius", "10px");
+
+        categoriaRow.add(categoriaDot, categoriaNombre, confianzaBadge);
+
+        categoriaSection = new VerticalLayout(categoriaLabel, categoriaRow);
+        categoriaSection.setPadding(false);
+        categoriaSection.setSpacing(false);
+        categoriaSection.getStyle().set("margin-top", "16px");
+        categoriaSection.setVisible(false);
+
+        // Palabras clave del clasificador
+        Span palabrasLabel = new Span("PALABRAS CLAVE");
+        palabrasLabel.getStyle()
+                .set("font-size", "10px").set("font-weight", "700").set("color", "#94a3b8")
+                .set("letter-spacing", "0.05em").set("display", "block");
 
         palabrasClaveLayout = new FlexLayout();
-        palabrasClaveLayout.getStyle().set("gap", "6px").set("flex-wrap", "wrap").set("margin-top", "10px");
+        palabrasClaveLayout.getStyle().set("gap", "6px").set("flex-wrap", "wrap").set("margin-top", "6px");
+
+        palabrasSection = new VerticalLayout(palabrasLabel, palabrasClaveLayout);
+        palabrasSection.setPadding(false);
+        palabrasSection.setSpacing(false);
+        palabrasSection.getStyle().set("margin-top", "16px");
+        palabrasSection.setVisible(false);
+
+        // Contenido relacionado por similitud de embeddings (pgvector)
+        Span relacionadosLabel = new Span("CONTENIDO RELACIONADO (similitud de embeddings)");
+        relacionadosLabel.getStyle()
+                .set("font-size", "10px").set("font-weight", "700").set("color", "#94a3b8")
+                .set("letter-spacing", "0.05em").set("display", "block");
 
         relacionadosLayout = new VerticalLayout();
         relacionadosLayout.setPadding(false);
         relacionadosLayout.setSpacing(false);
-        relacionadosLayout.getStyle().set("margin-top", "10px");
+        relacionadosLayout.getStyle().set("margin-top", "8px");
 
-        analysisPanel = new VerticalLayout(categoriaPill, palabrasClaveLayout, relacionadosLayout);
+        relacionadosSection = new VerticalLayout(relacionadosLabel, relacionadosLayout);
+        relacionadosSection.setPadding(false);
+        relacionadosSection.setSpacing(false);
+        relacionadosSection.getStyle().set("margin-top", "16px");
+        relacionadosSection.setVisible(false);
+
+        analysisPanel = new VerticalLayout(categoriaSection, palabrasSection, relacionadosSection);
         analysisPanel.setPadding(false);
         analysisPanel.setSpacing(false);
 
-        panel.add(title, analysisPlaceholder, analysisPanel);
+        panel.add(headerRow, analysisPlaceholder, analysisPanel);
         return panel;
+    }
+
+    private String colorForCategory(String category) {
+        if (category == null) {
+            return "#94a3b8";
+        }
+        return CATEGORY_COLORS.getOrDefault(category, "#64748b");
     }
 
     /** Enter en `field` hace clic en `button`. Fase de CAPTURA (`true` en addEventListener): el
@@ -592,30 +694,76 @@ public class AddContentView extends VerticalLayout {
     private void showAnalysisPreview(ContenidoResponseDTO contenido) {
         analysisPlaceholder.setVisible(false);
 
-        categoriaPill.setText("• " + (contenido.categoria() != null ? contenido.categoria() : "Sin clasificar"));
-        categoriaPill.getStyle().set("display", "inline-block");
+        boolean clasificado = contenido.categoria() != null && !contenido.categoria().isBlank();
+        statusBadge.setText(clasificado ? "COMPLETADO" : "SIN CLASIFICAR");
+        statusBadge.getStyle()
+                .set("background-color", clasificado ? "#d1fae5" : "#fef3c7")
+                .set("color", clasificado ? "#059669" : "#b45309");
+
+        String categoria = clasificado ? contenido.categoria() : "Sin clasificar";
+        String color = colorForCategory(clasificado ? categoria : null);
+        categoriaDot.getStyle().set("background-color", color);
+        categoriaNombre.setText(categoria);
+        categoriaNombre.getStyle().set("color", clasificado ? "#0f172a" : "#94a3b8");
+
+        if (contenido.probabilidad() != null) {
+            confianzaBadge.setText(Math.round(contenido.probabilidad() * 100) + "% confianza");
+            confianzaBadge.setVisible(true);
+        } else {
+            confianzaBadge.setVisible(false);
+        }
+        categoriaSection.setVisible(true);
 
         palabrasClaveLayout.removeAll();
-        contenido.palabrasClave().forEach(palabra -> {
-            Span chip = new Span(palabra);
-            chip.getStyle()
-                    .set("background-color", "#f1f5f9")
-                    .set("color", "#475569")
-                    .set("font-size", "11px")
-                    .set("padding", "3px 10px")
-                    .set("border-radius", "6px");
-            palabrasClaveLayout.add(chip);
-        });
+        List<String> palabras = contenido.palabrasClave();
+        boolean hayPalabras = palabras != null && !palabras.isEmpty();
+        palabrasSection.setVisible(hayPalabras);
+        if (hayPalabras) {
+            palabras.forEach(palabra -> {
+                Span chip = new Span(palabra);
+                chip.getStyle()
+                        .set("background-color", color + "1A")
+                        .set("color", color)
+                        .set("font-size", "11px")
+                        .set("font-weight", "600")
+                        .set("padding", "3px 10px")
+                        .set("border-radius", "6px");
+                palabrasClaveLayout.add(chip);
+            });
+        }
 
         relacionadosLayout.removeAll();
-        if (!contenido.contenidosRelacionados().isEmpty()) {
-            Span relacionadosTitle = new Span("Contenido relacionado (similitud de embeddings):");
-            relacionadosTitle.getStyle().set("font-weight", "600").set("font-size", "12px").set("color", "#334155");
-            relacionadosLayout.add(relacionadosTitle);
-            contenido.contenidosRelacionados().forEach(titulo -> {
-                Span item = new Span("• " + titulo);
-                item.getStyle().set("font-size", "12px").set("color", "#64748b");
-                relacionadosLayout.add(item);
+        var relacionados = contenido.contenidosRelacionados();
+        boolean hayRelacionados = relacionados != null && !relacionados.isEmpty();
+        relacionadosSection.setVisible(hayRelacionados);
+        if (hayRelacionados) {
+            relacionados.forEach(rel -> {
+                HorizontalLayout row = new HorizontalLayout();
+                row.setWidthFull();
+                row.setJustifyContentMode(JustifyContentMode.BETWEEN);
+                row.setAlignItems(Alignment.CENTER);
+                row.getStyle().set("padding", "6px 0").set("gap", "8px");
+
+                Span itemTitulo = new Span(rel.titulo() != null ? rel.titulo() : "Sin título");
+                itemTitulo.getStyle()
+                        .set("font-size", "12px")
+                        .set("color", "#334155")
+                        .set("overflow", "hidden")
+                        .set("text-overflow", "ellipsis")
+                        .set("white-space", "nowrap");
+
+                Span simBadge = new Span(Math.round(rel.similitud() * 100) + "%");
+                simBadge.getStyle()
+                        .set("background-color", "#f1f5f9")
+                        .set("color", "#475569")
+                        .set("font-size", "11px")
+                        .set("font-weight", "700")
+                        .set("padding", "2px 8px")
+                        .set("border-radius", "10px")
+                        .set("flex-shrink", "0");
+
+                row.add(itemTitulo, simBadge);
+                relacionadosLayout.add(row);
             });
         }
     }

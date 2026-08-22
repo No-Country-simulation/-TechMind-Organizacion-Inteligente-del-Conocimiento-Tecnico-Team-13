@@ -3,6 +3,7 @@ package com.application.service;
 import com.application.client.ModeloClienteService;
 import com.application.client.ModeloResponse;
 import com.application.client.openai.OpenAiEmbeddingService;
+import com.application.dto.ContenidoRelacionadoDTO;
 import com.application.dto.ContenidoRequestDTO;
 import com.application.dto.ContenidoResponseDTO;
 import com.application.exception.ModeloServiceException;
@@ -70,11 +71,13 @@ public class ContenidoService {
                                             String storagePath, String categoriaUsuario) {
         log.info("Procesando contenido: userId={}, titulo=\"{}\", tipo={}", userId, request.titulo(), tipoContenido);
         String categoria = null;
+        Double probabilidad = null;
         List<String> palabrasClave = Collections.emptyList();
         try {
             ModeloResponse analisis = modeloClienteService.analizarContenido(request.titulo(), request.texto()).block();
             if (analisis != null) {
                 categoria = analisis.categoria();
+                probabilidad = analisis.probabilidad();
                 palabrasClave = analisis.palabrasClave() != null ? analisis.palabrasClave() : Collections.emptyList();
             }
         } catch (ModeloServiceException e) {
@@ -83,6 +86,8 @@ public class ContenidoService {
 
         if (categoriaUsuario != null && !categoriaUsuario.isBlank()) {
             categoria = categoriaUsuario.trim();
+            // La probabilidad del clasificador ya no aplica: el usuario reemplazó su sugerencia.
+            probabilidad = null;
         }
 
         float[] embedding = null;
@@ -114,7 +119,7 @@ public class ContenidoService {
         log.info("Contenido guardado: id={}, titulo=\"{}\", categoria={}, embedding={}",
                 guardado.getId(), guardado.getTitulo(), guardado.getCategoria(), embedding != null ? "ok" : "no disponible");
 
-        List<String> relacionados = embedding != null
+        List<ContenidoRelacionadoDTO> relacionados = embedding != null
                 ? buscarRelacionados(embedding, guardado.getId())
                 : Collections.emptyList();
 
@@ -123,6 +128,7 @@ public class ContenidoService {
                 guardado.getTitulo(),
                 guardado.getTexto(),
                 guardado.getCategoria(),
+                probabilidad,
                 guardado.getPalabrasClave(),
                 relacionados,
                 guardado.getFechaCreacion().toLocalDateTime()
@@ -170,13 +176,13 @@ public class ContenidoService {
                 .collect(Collectors.toList());
     }
 
-    private List<String> buscarRelacionados(float[] embedding, Long excludeId) {
+    private List<ContenidoRelacionadoDTO> buscarRelacionados(float[] embedding, Long excludeId) {
         String literal = new PGvector(embedding).toString();
         return contenidoRepository.findTopSimilar(literal, relatedTopK + 1).stream()
                 .filter(m -> !m.getId().equals(excludeId))
                 .filter(m -> m.getSimilarity() != null && m.getSimilarity() >= relatedMinSimilarity)
                 .limit(relatedTopK)
-                .map(ContenidoRepository.SimilarityMatch::getTitulo)
+                .map(m -> new ContenidoRelacionadoDTO(m.getTitulo(), m.getSimilarity()))
                 .collect(Collectors.toList());
     }
 }

@@ -8,8 +8,9 @@ public record ContenidoResponseDTO(
         String titulo,
         String texto,
         String categoria,
+        Double probabilidad,
         List<String> palabrasClave,
-        List<String> contenidosRelacionados,
+        List<ContenidoRelacionadoDTO> contenidosRelacionados,
         LocalDateTime fechaCreacion
 ) {
 }
