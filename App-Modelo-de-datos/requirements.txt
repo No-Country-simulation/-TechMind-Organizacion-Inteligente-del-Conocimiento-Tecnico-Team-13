@@ -1,0 +1,21 @@
+# Clasificador de contenido tecnico (Flask + scikit-learn + spaCy).
+# Instalar con: pip install -r requirements.txt
+# Correr con:   python app.py   (queda escuchando en http://localhost:5000)
+
+flask>=3.0,<4.0
+joblib>=1.3,<2.0
+
+# Servidor WSGI de produccion (el Dockerfile lo usa en vez de "python app.py"; ese es el
+# servidor de desarrollo de Flask, no pensado para servir tráfico real).
+gunicorn>=21.2,<22.0
+
+# scikit-learn no se importa directo en app.py, pero pipeline_completo.pkl serializa un
+# Pipeline de sklearn (TfidfVectorizer + LinearSVC): joblib.load() lo necesita instalado
+# para poder deserializarlo, si no falla al cargar el modelo al arrancar.
+scikit-learn>=1.3,<2.0
+
+spacy>=3.7,<3.8
+
+# Modelo de espanol de spaCy que usa limpiar_texto(). Se instala como wheel directo para que
+# "pip install -r requirements.txt" alcance solo, sin correr aparte "python -m spacy download".
+https://github.com/explosion/spacy-models/releases/download/es_core_news_sm-3.7.0/es_core_news_sm-3.7.0-py3-none-any.whl

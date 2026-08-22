@@ -24,5 +24,11 @@ vite.generated.ts
 application-local.properties
 .env
 
+# Entorno virtual de Python (App-Modelo-de-datos) y artefactos de bytecode
+App-Modelo-de-datos/env/
+App-Modelo-de-datos/venv/
+__pycache__/
+*.pyc
+
 # Archivos auxiliares locales
 exclude.txt
