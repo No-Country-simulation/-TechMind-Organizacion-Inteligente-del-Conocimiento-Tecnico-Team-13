@@ -148,6 +148,20 @@ public class ContenidoService {
         return contenido;
     }
 
+    /** Cambia la categoría de un contenido (si pertenece al usuario) — usado desde CategoriesView
+     *  para mover contenido entre carpetas y para renombrar una categoría completa (llamando esto
+     *  una vez por cada contenido que la tenía). */
+    public void actualizarCategoria(Long id, UUID userId, String nuevaCategoria) {
+        Contenido contenido = contenidoRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Contenido no encontrado: " + id));
+        if (!contenido.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("No autorizado para modificar este contenido");
+        }
+        contenido.setCategoria(nuevaCategoria);
+        contenidoRepository.save(contenido);
+        log.info("Categoría actualizada: id={}, nuevaCategoria={}, userId={}", id, nuevaCategoria, userId);
+    }
+
     private List<DuplicateWarning> buscarPosiblesDuplicados(float[] embedding) {
         String literal = new PGvector(embedding).toString();
         return contenidoRepository.findTopSimilar(literal, 5).stream()

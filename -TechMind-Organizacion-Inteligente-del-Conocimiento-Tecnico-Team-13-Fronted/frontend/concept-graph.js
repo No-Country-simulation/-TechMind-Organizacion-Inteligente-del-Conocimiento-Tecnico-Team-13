@@ -7,15 +7,32 @@ export class ConceptGraph extends LitElement {
       display: block;
       width: 100%;
       height: 100%;
-      position: relative;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow: hidden;
+      box-sizing: border-box;
     }
 
     #network-container {
       width: 100%;
       height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow: hidden;
       background-color: #f8fafc;
       background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
       background-size: 24px 24px;
+    }
+
+    .vis-network {
+      overflow: hidden !important;
+      outline: none;
     }
   `;
 
@@ -33,6 +50,68 @@ export class ConceptGraph extends LitElement {
     this.renderPendingGraph();
   }
 
+  zoomIn() {
+    if (!this.network) return;
+    const currentScale = this.network.getScale();
+    this.network.moveTo({
+      scale: currentScale * 1.3,
+      animation: { duration: 300, easingFunction: 'easeInOutQuad' }
+    });
+  }
+
+  zoomOut() {
+    if (!this.network) return;
+    const currentScale = this.network.getScale();
+    this.network.moveTo({
+      scale: currentScale / 1.3,
+      animation: { duration: 300, easingFunction: 'easeInOutQuad' }
+    });
+  }
+
+  fitGraph() {
+    if (!this.network) return;
+    this.network.fit({
+      animation: { duration: 500, easingFunction: 'easeInOutQuad' }
+    });
+  }
+
+  exportGraph(fileName = 'concept-graph.png') {
+    if (!this.network || !this.container) {
+      return;
+    }
+
+    this.network.redraw();
+
+    const sourceCanvas = this.container.querySelector('canvas');
+    if (!sourceCanvas) {
+      return;
+    }
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = sourceCanvas.width;
+    exportCanvas.height = sourceCanvas.height;
+
+    const context = exportCanvas.getContext('2d');
+    context.fillStyle = '#f8fafc';
+    context.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    context.drawImage(sourceCanvas, 0, 0);
+
+    exportCanvas.toBlob((blob) => {
+      if (!blob) {
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }, 'image/png');
+  }
+
   renderPendingGraph() {
     if (!this.container || !this.pendingGraph) {
       return;
@@ -43,6 +122,7 @@ export class ConceptGraph extends LitElement {
     this.edges = new DataSet(edgesData);
 
     const options = {
+      autoResize: false,
       nodes: {
         shape: 'dot',
         size: 16,
@@ -64,6 +144,11 @@ export class ConceptGraph extends LitElement {
 
     this.network?.destroy();
     this.network = new Network(this.container, { nodes: this.nodes, edges: this.edges }, options);
+
+    // Initial fit once stabilized
+    this.network.once('stabilizationIterationsDone', () => {
+      this.network.fit({ animation: false });
+    });
 
     this.network.on('selectNode', (params) => {
       const selectedNodeId = params.nodes[0];

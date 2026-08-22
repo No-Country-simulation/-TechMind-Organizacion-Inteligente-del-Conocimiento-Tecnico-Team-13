@@ -58,11 +58,13 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
     private Set<String> activeContentTypes = new HashSet<>();
     private String activeDateRange = "Siempre";
     private boolean verifiedOnly = false;
+    private int minAiRelevance = 0;
     private String searchQuery = "";
     private FlexLayout activeFiltersBar;
     private int currentPage = 1;
     private int pageSize = 12;
     private HorizontalLayout paginationLayout;
+    private TextField searchField;
 
     public LibraryView(ContenidoService contenidoService, SupabaseService supabaseService, UserSession userSession) {
         this.contenidoService = contenidoService;
@@ -248,7 +250,7 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
         controls.setAlignItems(Alignment.CENTER);
         controls.setSpacing(true);
 
-        TextField searchField = new TextField();
+        searchField = new TextField();
         searchField.setPlaceholder("Buscar en la base de conocimiento");
         searchField.setPrefixComponent(VaadinIcon.SEARCH.create());
         searchField.setSuffixComponent(new Span("⌘K"));
@@ -335,33 +337,56 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
 
     private void updateActiveFiltersBar() {
         activeFiltersBar.removeAll();
-        boolean hasFilters = !activeCategories.isEmpty() || !activeContentTypes.isEmpty()
-                || !activeDateRange.equals("Siempre") || verifiedOnly || !searchQuery.isBlank();
+        boolean hasFilters = !searchQuery.isBlank() || !activeCategories.isEmpty() || !activeContentTypes.isEmpty()
+                || !activeDateRange.equals("Siempre") || verifiedOnly || minAiRelevance > 0;
 
         if (hasFilters) {
             if (!searchQuery.isBlank()) {
                 activeFiltersBar.add(createFilterChip("Búsqueda: " + searchQuery, () -> {
                     searchQuery = "";
+                    if (searchField != null && !searchField.isEmpty()) {
+                        searchField.clear();
+                    }
+                    currentPage = 1;
                     applyFilters();
                 }));
             }
-            activeCategories.forEach(category -> activeFiltersBar.add(createFilterChip("Category: " + category, () -> {
-                activeCategories.remove(category);
-                applyFilters();
-            })));
-            activeContentTypes.forEach(type -> activeFiltersBar.add(createFilterChip("Type: " + type, () -> {
-                activeContentTypes.remove(type);
-                applyFilters();
-            })));
+
+            activeCategories.forEach(category -> {
+                activeFiltersBar.add(createFilterChip("Category: " + category, () -> {
+                    activeCategories.remove(category);
+                    currentPage = 1;
+                    applyFilters();
+                }));
+            });
+
+            activeContentTypes.forEach(type -> {
+                activeFiltersBar.add(createFilterChip("Type: " + type, () -> {
+                    activeContentTypes.remove(type);
+                    currentPage = 1;
+                    applyFilters();
+                }));
+            });
+
             if (!activeDateRange.equals("Siempre")) {
                 activeFiltersBar.add(createFilterChip("Date: " + activeDateRange, () -> {
                     activeDateRange = "Siempre";
+                    currentPage = 1;
                     applyFilters();
                 }));
             }
             if (verifiedOnly) {
                 activeFiltersBar.add(createFilterChip("Verified Only", () -> {
                     verifiedOnly = false;
+                    currentPage = 1;
+                    applyFilters();
+                }));
+            }
+
+            if (minAiRelevance > 0) {
+                activeFiltersBar.add(createFilterChip("AI >= " + minAiRelevance + "%", () -> {
+                    minAiRelevance = 0;
+                    currentPage = 1;
                     applyFilters();
                 }));
             }
@@ -407,7 +432,7 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
         List<Contenido> pageContents = filteredContents.subList(start, end);
 
         if (pageContents.isEmpty()) {
-            cardsGrid.add(new Span("No se encontraron contenidos con los filtros seleccionados."));
+            cardsGrid.add(createEmptyState());
         } else {
             pageContents.forEach(content -> {
                 String timeAgo = formatTimeAgo(content.getFechaCreacion());
@@ -434,6 +459,35 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
 
         updateActiveFiltersBar();
         updatePagination(totalPages, filteredContents.size());
+    }
+
+    private Component createEmptyState() {
+        VerticalLayout emptyState = new VerticalLayout();
+        emptyState.setWidthFull();
+        emptyState.setAlignItems(Alignment.CENTER);
+        emptyState.setJustifyContentMode(JustifyContentMode.CENTER);
+        emptyState.getStyle()
+                .set("min-height", "240px")
+                .set("color", "#64748b")
+                .set("grid-column", "1 / -1");
+
+        Icon icon = VaadinIcon.SEARCH.create();
+        icon.setSize("32px");
+        icon.setColor("#94a3b8");
+
+        Span message = new Span("No se encontró ningún resultado.");
+        message.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "600")
+                .set("color", "#334155");
+
+        Span hint = new Span(searchQuery.isBlank()
+                ? "Prueba ajustando los filtros seleccionados."
+                : "Revisa el texto de búsqueda o intenta con otro título.");
+        hint.getStyle().set("font-size", "13px");
+
+        emptyState.add(icon, message, hint);
+        return emptyState;
     }
 
     private void updatePagination(int totalPages, int totalItems) {
@@ -469,7 +523,32 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
         boolean contentTypeMatch = activeContentTypes.isEmpty() || activeContentTypes.contains(content.getTipoContenido());
         boolean dateMatch = isWithinDateRange(content);
         boolean searchMatch = matchesSearch(content);
-        return categoryMatch && contentTypeMatch && dateMatch && searchMatch;
+        boolean verifiedMatch = !verifiedOnly || isVerified(content);
+        boolean relevanceMatch = calculateAiRelevance(content) >= minAiRelevance;
+        return categoryMatch && contentTypeMatch && dateMatch && searchMatch && verifiedMatch && relevanceMatch;
+    }
+
+    private boolean isVerified(Contenido content) {
+        String status = content.getEstadoProcesamiento() != null ? content.getEstadoProcesamiento().toLowerCase() : "";
+        return status.contains("complet")
+                || status.contains("procesad")
+                || status.contains("processed")
+                || status.contains("complete")
+                || status.contains("success");
+    }
+
+    private int calculateAiRelevance(Contenido content) {
+        int score = 25;
+        if (content.getTexto() != null && !content.getTexto().isBlank()) {
+            score += 45;
+        }
+        if (isVerified(content)) {
+            score += 20;
+        }
+        if (content.getTitulo() != null && !content.getTitulo().isBlank()) {
+            score += 10;
+        }
+        return Math.min(score, 100);
     }
 
     /** Filtro de búsqueda: coincide por título, texto o palabras clave (contains, sin distinguir mayúsculas). */
@@ -519,7 +598,12 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
         activeContentTypes.clear();
         activeDateRange = "Siempre";
         verifiedOnly = false;
+        minAiRelevance = 0;
         searchQuery = "";
+        if (searchField != null && !searchField.isEmpty()) {
+            searchField.clear();
+        }
+        currentPage = 1;
         applyFilters();
     }
 
@@ -610,8 +694,12 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
         });
         rightColumn.add(createFilterSection("Rango de Fechas", dateRange));
 
-        NativeRangeInput relevanceSlider = new NativeRangeInput(0, 100, 50);
+        NativeRangeInput relevanceSlider = new NativeRangeInput(0, 100, minAiRelevance);
         relevanceSlider.getStyle().set("width", "100%");
+        relevanceSlider.addValueChangeListener(source -> {
+            minAiRelevance = source.getValue();
+            updateResultsCount(resultsCount);
+        });
         rightColumn.add(createFilterSection("Relevancia IA", relevanceSlider));
 
         Checkbox verifiedCheckbox = new Checkbox("Mostrar solo verificados");
@@ -632,12 +720,14 @@ public class LibraryView extends VerticalLayout implements BeforeEnterObserver {
             categoryButtons.values().forEach(b -> b.removeThemeVariants(ButtonVariant.LUMO_PRIMARY));
             contentTypeButtons.values().forEach(b -> b.removeThemeVariants(ButtonVariant.LUMO_PRIMARY));
             dateRange.setValue("Siempre");
+            relevanceSlider.setValue(0);
             verifiedCheckbox.setValue(false);
             updateResultsCount(resultsCount);
         });
         clearButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
         Button applyButton = new Button("Aplicar Filtros", e -> {
+            currentPage = 1;
             applyFilters();
             dialog.close();
         });

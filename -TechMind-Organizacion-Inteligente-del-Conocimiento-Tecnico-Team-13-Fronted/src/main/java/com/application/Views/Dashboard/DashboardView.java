@@ -14,6 +14,7 @@ import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
+import com.vaadin.flow.router.RouterLink;
 import com.vaadin.flow.component.textfield.TextField;
 
 import java.util.List;
@@ -79,10 +80,7 @@ public class DashboardView extends VerticalLayout {
         HorizontalLayout actions = new HorizontalLayout();
         actions.setAlignItems(Alignment.CENTER);
 
-        TextField searchField = new TextField();
-        searchField.setPlaceholder("Busca concepto, tema o pr...");
-        searchField.setPrefixComponent(VaadinIcon.SEARCH.create());
-        searchField.setWidth("280px");
+       
 
         Button analyzeBtn = new Button("Buscar Contenido", VaadinIcon.MAGIC.create());
         analyzeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -94,7 +92,7 @@ public class DashboardView extends VerticalLayout {
         Icon bellIcon = VaadinIcon.BELL_O.create();
         bellIcon.getStyle().set("cursor", "pointer");
 
-        actions.add(searchField, analyzeBtn, bellIcon);
+        actions.add( analyzeBtn, bellIcon);
         header.add(titles, actions);
         return header;
     }
@@ -295,9 +293,12 @@ public class DashboardView extends VerticalLayout {
         actHeader.setWidthFull();
         actHeader.setJustifyContentMode(JustifyContentMode.BETWEEN);
         H4 actTitle = new H4("Actividad Reciente");
-        actTitle.getStyle().set("margin", "0");
-        Anchor viewAllAct = new Anchor("#", "Ver todo");
-        viewAllAct.getStyle().set("color", "#00b894").set("font-weight", "600");
+        RouterLink viewAllAct = new RouterLink("Ver todo", LibraryView.class);
+        viewAllAct.getStyle()
+        .set("color", "#00b894")
+        .set("font-weight", "600")
+        .set("text-decoration", "none"); // Quita el subrayado si lo deseas
+
         actHeader.add(actTitle, viewAllAct);
 
         VerticalLayout timeline = new VerticalLayout();
