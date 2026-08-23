@@ -12,6 +12,9 @@ RUN ./mvnw -q -DskipTests dependency:go-offline
 # vite.config.ts desde la raíz del proyecto. Copiar solo src/ (como antes) lo dejaba sin esos
 # archivos y fallaba con "Failed to find the following files: - ./concept-graph.js".
 COPY . .
+# COPY . . vuelve a traer mvnw sin el bit de ejecución (el chmod de la línea 7 solo aplicaba a la
+# copia anterior), por eso hay que repetirlo: si no, "./mvnw: Permission denied" (exit 126).
+RUN chmod +x mvnw
 # -Pproduction activa el goal build-frontend de Vaadin (genera flow-build-info.json y empaqueta
 # el bundle del frontend). Sin este perfil el jar queda en modo desarrollo, que en runtime intenta
 # levantar el dev server y falla porque el contenedor final solo tiene el .jar, no el proyecto
