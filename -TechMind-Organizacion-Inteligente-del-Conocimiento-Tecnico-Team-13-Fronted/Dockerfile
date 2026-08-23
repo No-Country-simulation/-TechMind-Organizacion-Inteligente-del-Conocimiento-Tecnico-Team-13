@@ -8,7 +8,11 @@ RUN chmod +x mvnw
 RUN ./mvnw -q -DskipTests dependency:go-offline
 
 COPY src ./src
-RUN ./mvnw -q -DskipTests clean package
+# -Pproduction activa el goal build-frontend de Vaadin (genera flow-build-info.json y empaqueta
+# el bundle del frontend). Sin este perfil el jar queda en modo desarrollo, que en runtime intenta
+# levantar el dev server y falla porque el contenedor final solo tiene el .jar, no el proyecto
+# Maven completo: "Failed to determine project directory for dev mode".
+RUN ./mvnw -q -DskipTests -Pproduction clean package
 
 FROM eclipse-temurin:21-jre
 
