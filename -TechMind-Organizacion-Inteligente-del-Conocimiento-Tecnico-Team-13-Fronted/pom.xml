@@ -194,6 +194,11 @@
                         <executions>
                             <execution>
                                 <goals>
+                                    <!-- prepare-frontend genera flow-build-info.json ("token file") con
+                                         productionMode=true; build-frontend solo lo ACTUALIZA, no lo crea.
+                                         Sin prepare-frontend antes, el jar quedaba sin ese archivo y en
+                                         runtime Vaadin seguía intentando arrancar en modo desarrollo. -->
+                                    <goal>prepare-frontend</goal>
                                     <goal>build-frontend</goal>
                                 </goals>
                             </execution>
