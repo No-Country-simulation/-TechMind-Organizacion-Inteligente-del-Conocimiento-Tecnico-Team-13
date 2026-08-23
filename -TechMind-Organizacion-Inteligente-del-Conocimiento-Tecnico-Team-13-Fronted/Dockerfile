@@ -7,7 +7,11 @@ COPY mvnw pom.xml ./
 RUN chmod +x mvnw
 RUN ./mvnw -q -DskipTests dependency:go-offline
 
-COPY src ./src
+# El build-frontend de Vaadin (activado por -Pproduction abajo) necesita más que src/: lee
+# frontend/ (concept-graph.js, index.html), package.json/package-lock.json, tsconfig.json y
+# vite.config.ts desde la raíz del proyecto. Copiar solo src/ (como antes) lo dejaba sin esos
+# archivos y fallaba con "Failed to find the following files: - ./concept-graph.js".
+COPY . .
 # -Pproduction activa el goal build-frontend de Vaadin (genera flow-build-info.json y empaqueta
 # el bundle del frontend). Sin este perfil el jar queda en modo desarrollo, que en runtime intenta
 # levantar el dev server y falla porque el contenedor final solo tiene el .jar, no el proyecto

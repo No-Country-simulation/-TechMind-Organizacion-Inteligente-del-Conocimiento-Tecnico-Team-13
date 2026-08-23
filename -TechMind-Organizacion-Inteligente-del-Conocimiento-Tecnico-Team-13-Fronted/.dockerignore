@@ -6,3 +6,5 @@ target/
 *.iml
 *.log
 .DS_Store
+node_modules/
+vite.config.ts.timestamp-*.mjs
