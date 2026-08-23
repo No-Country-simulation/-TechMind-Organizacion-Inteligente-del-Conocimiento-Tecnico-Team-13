@@ -56,6 +56,12 @@ public class ConceptGraphView extends VerticalLayout implements BeforeEnterObser
     public ConceptGraphView(ConceptGraphService conceptGraphService) {
         this.conceptGraphService = conceptGraphService;
 
+        // Sin esto la altura de la vista colapsa a 0: graphContainer solo tiene hijos con
+        // position:absolute (graphComponent y la leyenda), que no aportan altura a su padre, así
+        // que expand(mainContent) no tiene nada que expandir. El grafo (a 100% de un contenedor de
+        // 0px) queda invisible; la leyenda se ve igual porque, al ser absoluta, escapa del
+        // contenedor de altura 0 en vez de quedar recortada por él.
+        setSizeFull();
         setPadding(false);
         setSpacing(false);
 
