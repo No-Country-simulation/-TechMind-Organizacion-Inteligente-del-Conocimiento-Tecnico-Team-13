@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -50,14 +51,34 @@ public class RagChatService {
                documentos tenés" — eso está en BIBLIOTECA, úsalo.
 
             2) Preguntas sobre CONTENIDO específico (qué dice tal documento, cómo se configura X,
-               resume Y): para estas SÍ dependés estrictamente de CONTEXTO. Si CONTEXTO no alcanza
-               para responder, decilo explícitamente en vez de inventar — acá sí aplica la regla
-               estricta de no alucinar. Cuando uses un fragmento de CONTEXTO, citá el título exacto
-               entre corchetes, por ejemplo: [Kubernetes Best Practices].
+               resume Y, qué me recomiendas sobre Z): para estas SÍ dependés estrictamente de
+               CONTEXTO. Si CONTEXTO no alcanza para responder, decilo explícitamente en vez de
+               inventar — acá sí aplica la regla estricta de no alucinar. Cuando uses un fragmento
+               de CONTEXTO, citá el título exacto entre corchetes, por ejemplo:
+               [Kubernetes Best Practices].
 
             Muchas preguntas son mixtas (p.ej. "qué sabés de autenticación" mezcla "qué tenés
             guardado" con "contame el contenido") — en ese caso combinalas: mencioná qué hay en
             BIBLIOTECA relacionado y, si CONTEXTO trae algo, resumilo y citalo también.
+
+            GUARDARRIEL — SOS UN ASISTENTE SOBRE LA BIBLIOTECA DEL USUARIO, NO UN CHATBOT GENERAL:
+            cuando CONTEXTO no tiene la respuesta a una pregunta de tipo (2), tu única respuesta
+            válida es decir que no tenés esa información en la biblioteca del usuario — nunca la
+            completes con tu propio conocimiento general, aunque lo tengas y aunque el tema sea
+            técnico. Esto aplica siempre, sin excepción: recetas de cocina, explicar qué es
+            Kubernetes o AWS en general, sugerir herramientas que no estén en CONTEXTO/BIBLIOTECA,
+            adivinar con qué tecnología se construyó esta app, dar consejos de carrera genéricos,
+            "buscar en medios externos" (no podés, no tenés acceso a internet). Nada de eso sale de
+            la biblioteca del usuario, así que no es aceptable responderlo, ni siquiera como
+            "información adicional" o "por si te sirve" después del disclaimer. Patrón PROHIBIDO
+            (NO hagas esto): "No tengo información específica sobre X en tu biblioteca. Sin embargo,
+            puedo ofrecerte/contarte/explicarte..." seguido de la respuesta igual. Patrón CORRECTO:
+            decir que no está en su biblioteca y, si ayuda, sugerir con qué SÍ cuenta (usando
+            BIBLIOTECA) que se le acerque o que podría guardar para tener eso cubierto — sin
+            desarrollar el tema en sí. Ejemplo: pregunta "dame una receta de pasta a la boloñesa" →
+            responder algo como "No tengo información sobre recetas de cocina en tu biblioteca. Puedo
+            ayudarte con lo que sí tenés guardado ahí — por ejemplo tus documentos de [categoría/
+            título real de BIBLIOTECA]." y parar ahí, sin dar la receta.
 
             Responde en español, de forma breve, técnica, directa y natural — como una charla, no
             como un formulario rígido.
@@ -94,15 +115,15 @@ public class RagChatService {
     public record RagAnswer(String respuesta, List<Citation> fuentes) {
     }
 
-    public RagAnswer ask(String pregunta, List<ChatTurn> historial) {
-        return ask(pregunta, historial, etapa -> { });
+    public RagAnswer ask(UUID userId, String pregunta, List<ChatTurn> historial) {
+        return ask(userId, pregunta, historial, etapa -> { });
     }
 
     /** @param onStage callback informativo (para la UI: "generando embedding", "buscando...",
      *                 "generando respuesta"); no bloqueante, se puede pasar un no-op. */
-    public RagAnswer ask(String pregunta, List<ChatTurn> historial, Consumer<String> onStage) {
-        Recuperacion recuperacion = recuperarContexto(pregunta, onStage);
-        List<ChatTurn> mensajes = construirMensajes(pregunta, historial, recuperacion.contextoTexto());
+    public RagAnswer ask(UUID userId, String pregunta, List<ChatTurn> historial, Consumer<String> onStage) {
+        Recuperacion recuperacion = recuperarContexto(userId, pregunta, onStage);
+        List<ChatTurn> mensajes = construirMensajes(userId, pregunta, historial, recuperacion.contextoTexto());
 
         onStage.accept("Generando respuesta…");
         String respuesta = chatService.chat(mensajes);
@@ -112,9 +133,9 @@ public class RagChatService {
 
     /** Igual que {@link #ask}, pero la respuesta se transmite token a token vía onToken en vez de
      *  esperar el texto completo (ver OpenAiChatService#chatStreaming). */
-    public RagAnswer askStreaming(String pregunta, List<ChatTurn> historial, Consumer<String> onStage, Consumer<String> onToken) {
-        Recuperacion recuperacion = recuperarContexto(pregunta, onStage);
-        List<ChatTurn> mensajes = construirMensajes(pregunta, historial, recuperacion.contextoTexto());
+    public RagAnswer askStreaming(UUID userId, String pregunta, List<ChatTurn> historial, Consumer<String> onStage, Consumer<String> onToken) {
+        Recuperacion recuperacion = recuperarContexto(userId, pregunta, onStage);
+        List<ChatTurn> mensajes = construirMensajes(userId, pregunta, historial, recuperacion.contextoTexto());
 
         onStage.accept("Generando respuesta…");
         String respuesta = chatService.chatStreaming(mensajes, onToken);
@@ -125,14 +146,14 @@ public class RagChatService {
     private record Recuperacion(String contextoTexto, List<Citation> citas) {
     }
 
-    private Recuperacion recuperarContexto(String pregunta, Consumer<String> onStage) {
-        log.info("Consulta RAG recibida: \"{}\"", pregunta);
+    private Recuperacion recuperarContexto(UUID userId, String pregunta, Consumer<String> onStage) {
+        log.info("Consulta RAG recibida: userId={}, \"{}\"", userId, pregunta);
         onStage.accept("Generando embedding de la pregunta…");
         float[] embedding = embeddingService.embed(pregunta);
         String literal = new PGvector(embedding).toString();
 
         onStage.accept("Buscando contenido relacionado en la base de conocimiento…");
-        List<ContenidoRepository.SimilarityMatch> candidatos = contenidoRepository.findTopSimilar(literal, topK);
+        List<ContenidoRepository.SimilarityMatch> candidatos = contenidoRepository.findTopSimilarByUser(literal, userId, topK);
         // Detalle candidato por candidato: es lo que hace visible POR QUÉ algo entró o no al
         // contexto, en vez de solo el conteo final o el mejor score.
         candidatos.forEach(m -> log.info("  candidato: \"{}\" (id={}) similitud={} {} umbral {}",
@@ -168,21 +189,22 @@ public class RagChatService {
         return new Recuperacion(contextoTexto, citas);
     }
 
-    private List<ChatTurn> construirMensajes(String pregunta, List<ChatTurn> historial, String contextoTexto) {
+    private List<ChatTurn> construirMensajes(UUID userId, String pregunta, List<ChatTurn> historial, String contextoTexto) {
         List<ChatTurn> mensajes = new ArrayList<>();
         mensajes.add(ChatTurn.system(SYSTEM_PROMPT));
         mensajes.addAll(historial);
-        mensajes.add(ChatTurn.user("BIBLIOTECA:\n" + construirCatalogoBiblioteca()
+        mensajes.add(ChatTurn.user("BIBLIOTECA:\n" + construirCatalogoBiblioteca(userId)
                 + "\n\nCONTEXTO:\n" + contextoTexto + "\n\nPREGUNTA: " + pregunta));
         return mensajes;
     }
 
-    /** Catálogo liviano (categoría + título, sin texto) de todo lo guardado, para que el modelo
-     *  pueda responder preguntas sobre sí mismo/qué tiene disponible sin necesitar que la
-     *  búsqueda semántica encuentre nada — ver findAllBy() en ContenidoRepository. Se recalcula en
-     *  cada pregunta (consulta liviana) para reflejar contenido agregado durante la conversación. */
-    private String construirCatalogoBiblioteca() {
-        List<ContenidoRepository.TituloCategoria> items = contenidoRepository.findAllBy();
+    /** Catálogo liviano (categoría + título, sin texto) de lo que el usuario tiene guardado, para
+     *  que el modelo pueda responder preguntas sobre sí mismo/qué tiene disponible sin necesitar
+     *  que la búsqueda semántica encuentre nada — ver findByUserId() en ContenidoRepository. Se
+     *  recalcula en cada pregunta (consulta liviana) para reflejar contenido agregado durante la
+     *  conversación, y nunca incluye contenido de otros usuarios. */
+    private String construirCatalogoBiblioteca(UUID userId) {
+        List<ContenidoRepository.TituloCategoria> items = contenidoRepository.findByUserId(userId);
         if (items.isEmpty()) {
             return "(Todavía no hay contenido guardado en la base de conocimiento.)";
         }

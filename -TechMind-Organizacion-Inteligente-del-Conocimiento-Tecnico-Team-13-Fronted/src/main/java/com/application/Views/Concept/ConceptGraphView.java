@@ -3,7 +3,9 @@ package com.application.Views.Concept;
 import com.application.Views.AI.AiConsultantView;
 import com.application.Views.Layout.MainLayout;
 import com.application.Views.Library.LibraryView;
+import com.application.model.User;
 import com.application.service.ConceptGraphService;
+import com.application.service.UserSession;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Grafo de conceptos: nodos = Contenido guardado, aristas = similitud coseno de sus embeddings
@@ -46,6 +49,7 @@ public class ConceptGraphView extends VerticalLayout implements BeforeEnterObser
     );
 
     private final ConceptGraphService conceptGraphService;
+    private final UserSession userSession;
     private final ConceptGraphComponent graphComponent;
     private final VerticalLayout sidebar;
 
@@ -53,8 +57,9 @@ public class ConceptGraphView extends VerticalLayout implements BeforeEnterObser
     private Map<String, List<ConceptGraphService.Node>> vecinosPorNodo = new HashMap<>();
     private ConceptGraphService.Node nodoSeleccionado;
 
-    public ConceptGraphView(ConceptGraphService conceptGraphService) {
+    public ConceptGraphView(ConceptGraphService conceptGraphService, UserSession userSession) {
         this.conceptGraphService = conceptGraphService;
+        this.userSession = userSession;
 
         // Sin esto la altura de la vista colapsa a 0: graphContainer solo tiene hijos con
         // position:absolute (graphComponent y la leyenda), que no aportan altura a su padre, así
@@ -193,7 +198,15 @@ public class ConceptGraphView extends VerticalLayout implements BeforeEnterObser
     }
 
     private void loadGraphData() {
-        ConceptGraphService.Graph graph = conceptGraphService.build(4);
+        User authenticatedUser = userSession != null ? userSession.getAuthenticatedUser() : null;
+        if (authenticatedUser == null) {
+            nodesById = new HashMap<>();
+            vecinosPorNodo = new HashMap<>();
+            graphComponent.setGraphData(List.of(), List.of());
+            return;
+        }
+        UUID userId = authenticatedUser.getId();
+        ConceptGraphService.Graph graph = conceptGraphService.build(userId, 4);
 
         nodesById = new HashMap<>();
         vecinosPorNodo = new HashMap<>();

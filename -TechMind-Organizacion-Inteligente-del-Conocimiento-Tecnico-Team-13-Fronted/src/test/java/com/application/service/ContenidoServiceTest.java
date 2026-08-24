@@ -55,7 +55,7 @@ class ContenidoServiceTest {
 
         float[] embedding = new float[]{0.1f, 0.2f};
         when(embeddingService.embed(anyString())).thenReturn(embedding);
-        when(contenidoRepository.findTopSimilar(anyString(), anyInt())).thenReturn(List.of());
+        when(contenidoRepository.findTopSimilarByUser(anyString(), any(UUID.class), anyInt())).thenReturn(List.of());
 
         Contenido guardado = new Contenido();
         guardado.setId(1L);
@@ -85,7 +85,7 @@ class ContenidoServiceTest {
         when(modeloClienteService.analizarContenido(anyString(), anyString()))
                 .thenReturn(Mono.error(new ModeloServiceException("FastAPI caído")));
         when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f});
-        when(contenidoRepository.findTopSimilar(anyString(), anyInt())).thenReturn(List.of());
+        when(contenidoRepository.findTopSimilarByUser(anyString(), any(UUID.class), anyInt())).thenReturn(List.of());
 
         Contenido guardado = new Contenido();
         guardado.setId(2L);
@@ -123,7 +123,7 @@ class ContenidoServiceTest {
 
         assertThat(resultado.contenido().contenidosRelacionados()).isEmpty();
         assertThat(resultado.posiblesDuplicados()).isEmpty();
-        verify(contenidoRepository, never()).findTopSimilar(anyString(), anyInt());
+        verify(contenidoRepository, never()).findTopSimilarByUser(anyString(), any(UUID.class), anyInt());
     }
 
     @Test
@@ -139,7 +139,7 @@ class ContenidoServiceTest {
         when(match.getId()).thenReturn(99L);
         when(match.getTitulo()).thenReturn("Contenido parecido");
         when(match.getSimilarity()).thenReturn(0.95);
-        when(contenidoRepository.findTopSimilar(anyString(), anyInt())).thenReturn(List.of(match));
+        when(contenidoRepository.findTopSimilarByUser(anyString(), any(UUID.class), anyInt())).thenReturn(List.of(match));
 
         Contenido guardado = new Contenido();
         guardado.setId(4L);

@@ -15,19 +15,23 @@ public interface ContenidoRepository extends JpaRepository<Contenido, Long> {
     List<Contenido> findByUserIdOrderByFechaCreacionDesc(UUID userId);
 
     /**
-     * Los "topK" contenidos con embedding mas parecido (coseno) al vector dado, ordenados de mas a
-     * menos similar. embeddingLiteral es el formato de texto de pgvector, p.ej. "[0.01,-0.02,...]"
-     * (ver EmbeddingVectors.toPgVectorLiteral). Se usa tanto para "relacionados" (post-guardado,
-     * filtrando el propio id en el servicio) como para deteccion de casi-duplicados (pre-guardado).
+     * Los "topK" contenidos DEL MISMO USUARIO con embedding mas parecido (coseno) al vector dado,
+     * ordenados de mas a menos similar. embeddingLiteral es el formato de texto de pgvector, p.ej.
+     * "[0.01,-0.02,...]" (ver EmbeddingVectors.toPgVectorLiteral). Se usa tanto para "relacionados"
+     * (post-guardado, filtrando el propio id en el servicio) como para deteccion de
+     * casi-duplicados (pre-guardado) y como recuperacion de contexto del RAG: en los tres casos el
+     * usuario nunca debe ver ni recibir citas de contenido de otro usuario.
      */
     @Query(value = """
             SELECT id, titulo, categoria, (1 - (embedding <=> CAST(:embedding AS vector))) AS similarity
             FROM public.contenido
-            WHERE embedding IS NOT NULL
+            WHERE embedding IS NOT NULL AND user_id = :userId
             ORDER BY embedding <=> CAST(:embedding AS vector) ASC
             LIMIT :topK
             """, nativeQuery = true)
-    List<SimilarityMatch> findTopSimilar(@Param("embedding") String embeddingLiteral, @Param("topK") int topK);
+    List<SimilarityMatch> findTopSimilarByUser(@Param("embedding") String embeddingLiteral,
+                                                @Param("userId") UUID userId,
+                                                @Param("topK") int topK);
 
     interface SimilarityMatch {
         Long getId();
@@ -36,10 +40,10 @@ public interface ContenidoRepository extends JpaRepository<Contenido, Long> {
         Double getSimilarity();
     }
 
-    /** Solo título + categoría (sin texto/embedding), para armar el catálogo liviano que
-     *  RagChatService le da al modelo como "de qué temas sé" — no confundir con findTopSimilar,
-     *  que es la búsqueda semántica real para responder con contenido citado. */
-    List<TituloCategoria> findAllBy();
+    /** Solo título + categoría (sin texto/embedding) DEL USUARIO, para armar el catálogo liviano
+     *  que RagChatService le da al modelo como "de qué temas sé" — no confundir con
+     *  findTopSimilarByUser, que es la búsqueda semántica real para responder con contenido citado. */
+    List<TituloCategoria> findByUserId(UUID userId);
 
     interface TituloCategoria {
         String getTitulo();

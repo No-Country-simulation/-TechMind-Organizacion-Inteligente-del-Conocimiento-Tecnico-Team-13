@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -42,8 +43,10 @@ public class ConceptGraphService {
     public record Graph(List<Node> nodos, List<Edge> aristas) {
     }
 
-    public Graph build(int maxAristasPorNodo) {
-        List<Contenido> todos = contenidoRepository.findAll();
+    /** El grafo se calcula solo con el contenido del usuario dado — nunca mezcla contenido de
+     *  otros usuarios, ni como nodo ni como candidato de similitud. */
+    public Graph build(UUID userId, int maxAristasPorNodo) {
+        List<Contenido> todos = contenidoRepository.findByUserIdOrderByFechaCreacionDesc(userId);
 
         List<Node> nodos = todos.stream()
                 .map(c -> new Node(c.getId(), c.getTitulo(),
@@ -58,7 +61,7 @@ public class ConceptGraphService {
                 continue;
             }
             String literal = new PGvector(c.getEmbedding()).toString();
-            contenidoRepository.findTopSimilar(literal, maxAristasPorNodo + 1).stream()
+            contenidoRepository.findTopSimilarByUser(literal, userId, maxAristasPorNodo + 1).stream()
                     .filter(m -> !m.getId().equals(c.getId()))
                     .filter(m -> m.getSimilarity() != null && m.getSimilarity() >= minSimilarity)
                     .forEach(m -> {
@@ -68,7 +71,7 @@ public class ConceptGraphService {
                         }
                     });
         }
-        log.info("Grafo de conceptos construido: {} nodo(s), {} arista(s)", nodos.size(), aristas.size());
+        log.info("Grafo de conceptos construido: userId={}, {} nodo(s), {} arista(s)", userId, nodos.size(), aristas.size());
         return new Graph(nodos, aristas);
     }
 

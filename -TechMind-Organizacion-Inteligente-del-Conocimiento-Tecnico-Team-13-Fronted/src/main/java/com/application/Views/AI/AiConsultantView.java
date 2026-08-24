@@ -464,7 +464,7 @@ public class AiConsultantView extends HorizontalLayout {
             Div[] respuestaDiv = new Div[1];
             StringBuilder acumulado = new StringBuilder();
             try {
-                RagChatService.RagAnswer respuesta = ragChatService.askStreaming(pregunta, historialSnapshot,
+                RagChatService.RagAnswer respuesta = ragChatService.askStreaming(currentUserId, pregunta, historialSnapshot,
                         etapa -> ui.access(() -> thinking.estadoSpan().setText(etapa)),
                         token -> ui.access(() -> {
                             if (respuestaDiv[0] == null) {

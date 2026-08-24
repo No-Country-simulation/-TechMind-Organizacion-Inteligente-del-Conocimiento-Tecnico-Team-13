@@ -98,7 +98,7 @@ public class ContenidoService {
         }
 
         List<DuplicateWarning> duplicados = embedding != null
-                ? buscarPosiblesDuplicados(embedding)
+                ? buscarPosiblesDuplicados(userId, embedding)
                 : Collections.emptyList();
         if (!duplicados.isEmpty()) {
             log.warn("Posibles duplicados detectados para \"{}\": {}", request.titulo(), duplicados);
@@ -120,7 +120,7 @@ public class ContenidoService {
                 guardado.getId(), guardado.getTitulo(), guardado.getCategoria(), embedding != null ? "ok" : "no disponible");
 
         List<ContenidoRelacionadoDTO> relacionados = embedding != null
-                ? buscarRelacionados(embedding, guardado.getId())
+                ? buscarRelacionados(userId, embedding, guardado.getId())
                 : Collections.emptyList();
 
         ContenidoResponseDTO dto = new ContenidoResponseDTO(
@@ -168,17 +168,17 @@ public class ContenidoService {
         log.info("Categoría actualizada: id={}, nuevaCategoria={}, userId={}", id, nuevaCategoria, userId);
     }
 
-    private List<DuplicateWarning> buscarPosiblesDuplicados(float[] embedding) {
+    private List<DuplicateWarning> buscarPosiblesDuplicados(UUID userId, float[] embedding) {
         String literal = new PGvector(embedding).toString();
-        return contenidoRepository.findTopSimilar(literal, 5).stream()
+        return contenidoRepository.findTopSimilarByUser(literal, userId, 5).stream()
                 .filter(m -> m.getSimilarity() != null && m.getSimilarity() >= duplicateThreshold)
                 .map(m -> new DuplicateWarning(m.getId(), m.getTitulo(), m.getSimilarity()))
                 .collect(Collectors.toList());
     }
 
-    private List<ContenidoRelacionadoDTO> buscarRelacionados(float[] embedding, Long excludeId) {
+    private List<ContenidoRelacionadoDTO> buscarRelacionados(UUID userId, float[] embedding, Long excludeId) {
         String literal = new PGvector(embedding).toString();
-        return contenidoRepository.findTopSimilar(literal, relatedTopK + 1).stream()
+        return contenidoRepository.findTopSimilarByUser(literal, userId, relatedTopK + 1).stream()
                 .filter(m -> !m.getId().equals(excludeId))
                 .filter(m -> m.getSimilarity() != null && m.getSimilarity() >= relatedMinSimilarity)
                 .limit(relatedTopK)

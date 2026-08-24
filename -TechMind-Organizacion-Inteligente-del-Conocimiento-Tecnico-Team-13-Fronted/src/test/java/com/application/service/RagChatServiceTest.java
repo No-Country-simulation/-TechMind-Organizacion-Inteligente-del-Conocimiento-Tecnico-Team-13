@@ -12,8 +12,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -41,7 +43,7 @@ class RagChatServiceTest {
         ContenidoRepository.SimilarityMatch match = mock(ContenidoRepository.SimilarityMatch.class);
         when(match.getId()).thenReturn(10L);
         when(match.getSimilarity()).thenReturn(0.88);
-        when(contenidoRepository.findTopSimilar(anyString(), anyInt())).thenReturn(List.of(match));
+        when(contenidoRepository.findTopSimilarByUser(anyString(), any(UUID.class), anyInt())).thenReturn(List.of(match));
 
         Contenido contenido = new Contenido();
         contenido.setId(10L);
@@ -51,7 +53,7 @@ class RagChatServiceTest {
 
         when(chatService.chat(anyList())).thenReturn("Kubernetes es un orquestador [Kubernetes Best Practices].");
 
-        RagChatService.RagAnswer respuesta = ragChatService.ask("¿Qué es Kubernetes?", List.of());
+        RagChatService.RagAnswer respuesta = ragChatService.ask(UUID.randomUUID(), "¿Qué es Kubernetes?", List.of());
 
         assertThat(respuesta.respuesta()).contains("orquestador");
         assertThat(respuesta.fuentes()).hasSize(1);
@@ -70,10 +72,10 @@ class RagChatServiceTest {
         RagChatService ragChatService = new RagChatService(contenidoRepository, embeddingService, chatService, 3, 0.75);
 
         when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f});
-        when(contenidoRepository.findTopSimilar(anyString(), anyInt())).thenReturn(List.of());
+        when(contenidoRepository.findTopSimilarByUser(anyString(), any(UUID.class), anyInt())).thenReturn(List.of());
         when(chatService.chat(anyList())).thenReturn("No tengo información sobre esto en la base de conocimiento.");
 
-        RagChatService.RagAnswer respuesta = ragChatService.ask("¿Algo muy random?", List.of());
+        RagChatService.RagAnswer respuesta = ragChatService.ask(UUID.randomUUID(), "¿Algo muy random?", List.of());
 
         assertThat(respuesta.fuentes()).isEmpty();
 

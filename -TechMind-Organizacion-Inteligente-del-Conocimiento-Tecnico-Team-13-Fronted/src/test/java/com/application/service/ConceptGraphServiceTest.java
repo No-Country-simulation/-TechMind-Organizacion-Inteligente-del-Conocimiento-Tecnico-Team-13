@@ -8,8 +8,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -39,7 +41,7 @@ class ConceptGraphServiceTest {
         b.setCategoria("Backend");
         b.setEmbedding(new float[]{0.1f});
 
-        when(contenidoRepository.findAll()).thenReturn(List.of(a, b));
+        when(contenidoRepository.findByUserIdOrderByFechaCreacionDesc(any(UUID.class))).thenReturn(List.of(a, b));
 
         ContenidoRepository.SimilarityMatch matchBDesdeA = mock(ContenidoRepository.SimilarityMatch.class);
         when(matchBDesdeA.getId()).thenReturn(2L);
@@ -49,11 +51,11 @@ class ConceptGraphServiceTest {
         when(matchADesdeB.getId()).thenReturn(1L);
         when(matchADesdeB.getSimilarity()).thenReturn(0.9);
 
-        when(contenidoRepository.findTopSimilar(anyString(), anyInt()))
+        when(contenidoRepository.findTopSimilarByUser(anyString(), any(UUID.class), anyInt()))
                 .thenReturn(List.of(matchBDesdeA))
                 .thenReturn(List.of(matchADesdeB));
 
-        ConceptGraphService.Graph graph = service.build(4);
+        ConceptGraphService.Graph graph = service.build(UUID.randomUUID(), 4);
 
         assertThat(graph.nodos()).hasSize(2);
         // A-B y B-A deben colapsar en una sola arista, no dos.
@@ -69,12 +71,12 @@ class ConceptGraphServiceTest {
         sinEmbedding.setTitulo("Sin embedding");
         sinEmbedding.setCategoria("Backend");
 
-        when(contenidoRepository.findAll()).thenReturn(List.of(sinEmbedding));
+        when(contenidoRepository.findByUserIdOrderByFechaCreacionDesc(any(UUID.class))).thenReturn(List.of(sinEmbedding));
 
-        ConceptGraphService.Graph graph = service.build(4);
+        ConceptGraphService.Graph graph = service.build(UUID.randomUUID(), 4);
 
         assertThat(graph.nodos()).hasSize(1);
         assertThat(graph.aristas()).isEmpty();
-        verify(contenidoRepository, never()).findTopSimilar(anyString(), anyInt());
+        verify(contenidoRepository, never()).findTopSimilarByUser(anyString(), any(UUID.class), anyInt());
     }
 }
