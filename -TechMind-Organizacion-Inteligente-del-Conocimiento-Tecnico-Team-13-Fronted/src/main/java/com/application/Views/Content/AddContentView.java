@@ -38,7 +38,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @PageTitle("Add Content - KnowBase")
-@Route(value = "add-content", layout = MainLayout.class)\
+@Route(value = "add-content", layout = MainLayout.class)
 public class AddContentView extends VerticalLayout {
 
     private static final Logger log = LoggerFactory.getLogger(AddContentView.class);
