@@ -13,6 +13,12 @@ src/main/frontend/generated/
 **/src/main/frontend/generated/
 vite.generated.ts
 **/vite.generated.ts
+.flow-node-tasks.lock
+**/.flow-node-tasks.lock
+
+# Logs locales
+logs/
+**/logs/
 
 # Entorno e IDEs
 .idea/

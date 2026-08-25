@@ -38,7 +38,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @PageTitle("Add Content - KnowBase")
-@Route(value = "add-content", layout = MainLayout.class)
+@Route(value = "add-content", layout = MainLayout.class)\
 public class AddContentView extends VerticalLayout {
 
     private static final Logger log = LoggerFactory.getLogger(AddContentView.class);
@@ -123,7 +123,9 @@ public class AddContentView extends VerticalLayout {
 
         add(createHeader());
         add(createTabsSection());
-        add(createMainWorkspace());
+        HorizontalLayout workspace = createMainWorkspace();
+        add(workspace);
+        expand(workspace);
     }
 
     private HorizontalLayout createHeader() {
@@ -234,6 +236,7 @@ public class AddContentView extends VerticalLayout {
 
     private VerticalLayout createLeftPanel() {
         VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
         panel.getStyle()
                 .set("background-color", "#ffffff")
                 .set("border-radius", "16px")
@@ -253,19 +256,21 @@ public class AddContentView extends VerticalLayout {
         header.add(title);
 
         inputContainer = new VerticalLayout();
+        inputContainer.setSizeFull();
         inputContainer.setPadding(false);
         inputContainer.setSpacing(true);
         inputContainer.setWidthFull();
 
         textArea = new TextArea("Texto o artículo");
         textArea.setPlaceholder("Escribe o pega el texto técnico aquí...");
-        textArea.setHeight("500px");
+        textArea.setSizeFull();
+        textArea.setWidthFull();
+        textArea.setMinHeight("380px");
         textArea.getStyle()
                 .set("font-family", "'Consolas', 'Courier New', monospace")
                 .set("font-size", "13px")
                 .set("border-radius", "12px")
                 .set("background-color", "#f8fafc")
-                .set("padding", "12px")
                 .set("box-shadow", "inset 0 0 0 1px #e2e8f0");
 
         urlField = new TextField("URL del recurso");
@@ -280,6 +285,8 @@ public class AddContentView extends VerticalLayout {
         upload.getStyle().set("border-radius", "12px");
 
         inputContainer.add(textArea, urlField, upload);
+        inputContainer.setFlexGrow(1, textArea);
+        inputContainer.expand(textArea);
         setActiveInputMode(activeInputMode);
 
         Button analyzeBtn = new Button("Procesar", VaadinIcon.MAGIC.create());
@@ -298,6 +305,8 @@ public class AddContentView extends VerticalLayout {
         bindEnterToClick(urlField, analyzeBtn);
 
         panel.add(header, inputContainer, analyzeBtn);
+        panel.setFlexGrow(1, inputContainer);
+        panel.expand(inputContainer);
         return panel;
     }
 
@@ -549,6 +558,7 @@ public class AddContentView extends VerticalLayout {
 
     private VerticalLayout createRightPanel() {
         VerticalLayout panel = new VerticalLayout();
+        panel.setSizeFull();
         panel.getStyle()
                 .set("background-color", "#ffffff")
                 .set("border-radius", "16px")

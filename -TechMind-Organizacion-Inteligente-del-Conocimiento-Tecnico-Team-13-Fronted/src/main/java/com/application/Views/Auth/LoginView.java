@@ -39,7 +39,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String EMAIL_REGEX = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}$";
     private static final String PASSWORD_REGEX = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!])(?=\\S+$).{8,}$";
-    private static final String NAME_REGEX = "^[a-zA-Z\s]+$";
+    private static final String NAME_REGEX = "^[a-zA-Z\\s]+$";
 
     public LoginView(AuthService authService) {
         this.authService = authService;
@@ -53,7 +53,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         // Tarjeta principal
         HorizontalLayout cardContainer = new HorizontalLayout();
         cardContainer.setWidth("850px");
-        cardContainer.setHeight("500px");
+        cardContainer.setHeight("520px");
         cardContainer.setPadding(false);
         cardContainer.setSpacing(false);
         cardContainer.getStyle()
@@ -86,19 +86,20 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
                 .set("padding", "32px");
 
         HorizontalLayout logoLayout = new HorizontalLayout();
-        Icon logoIcon = VaadinIcon.DROP.create();
-        logoIcon.setSize("24px");
+        Image brandLogo = new Image("Logo-Logicore.svg", "Logicore Logo");
+        brandLogo.setMaxHeight("26px");
+        brandLogo.setMaxWidth("26px");
+        brandLogo.getStyle().set("object-fit", "contain");
         Span brandName = new Span("Logicore");
         brandName.getStyle().set("font-weight", "700").set("font-size", "1.2rem");
-        logoLayout.add(logoIcon, brandName);
+        logoLayout.add(brandLogo, brandName);
         logoLayout.setAlignItems(Alignment.CENTER);
 
-        Image illustration = new Image("Logicore-Logo.jpg", "Illustration");
+        Image illustration = new Image("Logo-Logicore.svg", "Illustration");
         
         illustration.setWidth("100%");
         illustration.setMaxWidth("260px");
         illustration.getStyle().set("margin", "auto");
-        add(illustration);;
 
         H2 welcomeTitle = new H2("¡Bienvenido a Logicore!");
         welcomeTitle.getStyle().set("margin", "0").set("color", "white").set("font-weight", "600");
@@ -144,17 +145,8 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         H2 loginTitle = new H2("Log In");
         loginTitle.getStyle().set("color", "#0066FF").set("margin-bottom", "4px").set("font-weight", "600");
 
-        HorizontalLayout registerLayout = new HorizontalLayout();
-        Span noAccount = new Span("Don't have an account? ");
-        noAccount.getStyle().set("font-size", "0.8rem").set("color", "#7e8e9f");
-        Button createAccountLink = new Button("Create an account", e -> showRegisterForm());
-        createAccountLink.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        createAccountLink.getStyle().set("font-size", "0.8rem").set("color", "#0066FF");
-        registerLayout.add(noAccount, createAccountLink);
-        registerLayout.setSpacing(false);
-
-        Span subtitle = new Span("It will take less than a minute.");
-        subtitle.getStyle().set("font-size", "0.75rem").set("color", "#a0aec0").set("margin-bottom", "20px");
+        Span subtitle = new Span("Welcome back! Please enter your details.");
+        subtitle.getStyle().set("font-size", "0.8rem").set("color", "#a0aec0").set("margin-bottom", "20px");
 
         TextField usernameField = new TextField();
         usernameField.setPlaceholder("Username");
@@ -201,9 +193,23 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         actionLayout.getStyle().set("margin-top", "24px");
 
         Anchor forgotPassword = new Anchor("#", "Forget your password?");
-        forgotPassword.getStyle().set("font-size", "0.8rem").set("color", "#0066FF").set("margin-top", "24px").set("align-self", "center");
+        forgotPassword.getStyle().set("font-size", "0.8rem").set("color", "#0066FF").set("margin-top", "18px").set("align-self", "center");
 
-        loginForm.add(loginTitle, registerLayout, subtitle, usernameField, passwordField, actionLayout, forgotPassword);
+        // Botón Crear Cuenta con la misma estética, ubicado al final debajo de olvidaste contraseña
+        Button createAccountBtn = new Button("Create an account", e -> showRegisterForm());
+        createAccountBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        createAccountBtn.setWidthFull();
+        createAccountBtn.getStyle()
+                .set("background-color", "#ffffff")
+                .set("color", "#0066FF")
+                .set("border", "1.5px solid #0066FF")
+                .set("border-radius", "6px")
+                .set("padding", "0 24px")
+                .set("font-weight", "600")
+                .set("margin-top", "16px")
+                .set("cursor", "pointer");
+
+        loginForm.add(loginTitle, subtitle, usernameField, passwordField, actionLayout, forgotPassword, createAccountBtn);
 
         // Atajo: Enter en usuario o contraseña dispara "Sign in". Se hace con JS puro (en vez de
         // Shortcuts/addClickShortcut de Vaadin) porque el PasswordField envuelve su <input> en un
