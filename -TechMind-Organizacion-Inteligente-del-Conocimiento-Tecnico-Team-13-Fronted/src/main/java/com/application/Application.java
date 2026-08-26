@@ -44,7 +44,7 @@ public class Application implements AppShellConfigurator {
         // 4. Icono PNG de alta resolución para navegadores modernos y móviles
         Map<String, String> pngAttr = new HashMap<>();
         pngAttr.put("type", "image/png");
-        pngAttr.put("href", "images/Logicore-logo.png");
+        pngAttr.put("href", "images/LogicoreLogoico.png");
         settings.addLink("icon", pngAttr);
         settings.addLink("apple-touch-icon", pngAttr);
     }
