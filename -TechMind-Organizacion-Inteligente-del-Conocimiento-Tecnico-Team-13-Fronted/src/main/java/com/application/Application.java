@@ -22,31 +22,12 @@ public class Application implements AppShellConfigurator {
 
     @Override
     public void configurePage(AppShellSettings settings) {
-        // 1. Icono SVG principal Logicore
-        Map<String, String> svgAttr = new HashMap<>();
-        svgAttr.put("type", "image/svg+xml");
-        svgAttr.put("href", "Logo-Logicore.svg");
-        settings.addLink("icon", svgAttr);
-
-        // 2. Icono estándar .ico para pestañas de navegador
-        Map<String, String> icoAttr = new HashMap<>();
-        icoAttr.put("type", "image/x-icon");
-        icoAttr.put("href", "favicon.ico");
-        settings.addLink("shortcut icon", icoAttr);
-        settings.addLink("icon", icoAttr);
-
-        // 3. Icono específico Logicore-logo.ico como respaldo
-        Map<String, String> logicoreIcoAttr = new HashMap<>();
-        logicoreIcoAttr.put("type", "image/x-icon");
-        logicoreIcoAttr.put("href", "Logicore-logo.ico");
-        settings.addLink("icon", logicoreIcoAttr);
-
-        // 4. Icono PNG de alta resolución para navegadores modernos y móviles
-        Map<String, String> pngAttr = new HashMap<>();
-        pngAttr.put("type", "image/png");
-        pngAttr.put("href", "images/LogicoreLogoico.png");
-        settings.addLink("icon", pngAttr);
-        settings.addLink("apple-touch-icon", pngAttr);
+        Map<String, String> iconAttr = new HashMap<>();
+        iconAttr.put("type", "image/png");
+        iconAttr.put("href", "images/LogicoreLogoico.png");
+        settings.addLink("icon", iconAttr);
+        settings.addLink("shortcut icon", iconAttr);
+        settings.addLink("apple-touch-icon", iconAttr);
     }
 
 }

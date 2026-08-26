@@ -89,10 +89,10 @@ public class AppSidebar extends VerticalLayout implements BeforeEnterObserver {
         HorizontalLayout logoBrand = new HorizontalLayout();
         logoBrand.setAlignItems(Alignment.CENTER);
         logoBrand.setSpacing(true);
+        logoBrand.setWidthFull();
 
         Image logoImage = new Image("LogoVertical-logicore.jpg", "LogiCore Logo");
-        logoImage.setMaxHeight("38px");
-        logoImage.setMaxWidth("150px");
+        logoImage.setWidthFull();
         logoImage.getStyle().set("object-fit", "contain").set("border-radius", "6px");
         logoBrand.add(logoImage);
 
@@ -114,6 +114,7 @@ public class AppSidebar extends VerticalLayout implements BeforeEnterObserver {
         });
 
         logoLayout.add(logoBrand, collapseBtn);
+        logoLayout.expand(logoBrand);
         add(logoLayout);
 
         // Separador
